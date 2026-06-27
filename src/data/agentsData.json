@@ -1,0 +1,239 @@
+{
+  "equity_labs_v1": [
+    {
+      "id": "ag_01",
+      "name": { "es": "Architect", "en": "Architect", "it": "Architetto" },
+      "engines": { "free": "StepFun 3.5 Flash", "pro": "Gemini 3 Flash Preview" },
+      "tasks": {
+        "es": ["Modelado espacial lógico", "Planos técnicos eficientes", "Simulación de estabilidad"],
+        "en": ["Logical spatial modeling", "Efficient technical blueprints", "Stability simulation"],
+        "it": ["Modellazione spaziale logica", "Planimetrie tecniche efficienti", "Simulazione di stabilità"]
+      }
+    },
+    {
+      "id": "ag_02",
+      "name": { "es": "Urban Explorer", "en": "Urban Explorer", "it": "Esploratore Urbano" },
+      "engines": { "free": "DeepSeek R1 0528", "pro": "GLM 5" },
+      "tasks": {
+        "es": ["Escaneo de tendencias urbanas", "Mapeo de flujos sociales", "Detección de zonas de valor"],
+        "en": ["Urban trend scanning", "Social flow mapping", "Value zone detection"],
+        "it": ["Scansione tendenze urbane", "Mappatura flussi sociali", "Rilevamento zone di valore"]
+      }
+    },
+    {
+      "id": "ag_03",
+      "name": { "es": "Environmental Detective", "en": "Environmental Detective", "it": "Detective Ambientale" },
+      "engines": { "free": "Arcee Trinity Large", "pro": "Qwen 3.5 Plus" },
+      "tasks": {
+        "es": ["Auditoría de impacto CO2", "Detección de riesgos eco", "Cumplimiento normativo"],
+        "en": ["CO2 impact audit", "Eco-risk detection", "Regulatory compliance"],
+        "it": ["Audit impatto CO2", "Rilevamento rischi eco", "Conformità normativa"]
+      }
+    },
+    {
+      "id": "ag_04",
+      "name": { "es": "Intelligent Appraiser", "en": "Intelligent Appraiser", "it": "Perito Intelligente" },
+      "engines": { "free": "Qwen 3 Next 80B", "pro": "DeepSeek V3.2" },
+      "tasks": {
+        "es": ["Valoración de activos IA", "Análisis de mercado real", "Predicción de plusvalía"],
+        "en": ["AI asset valuation", "Real market analysis", "Capital gain prediction"],
+        "it": ["Valutazione asset IA", "Analisi di mercato reale", "Predizione plusvalenza"]
+      }
+    },
+    {
+      "id": "ag_05",
+      "name": { "es": "Infrastructure Analyst", "en": "Infrastructure Analyst", "it": "Analista Infrastrutture" },
+      "engines": { "free": "Llama 3.3 70B", "pro": "Mistral Large 3" },
+      "tasks": {
+        "es": ["Diagnóstico de redes", "Optimización de suministros", "Prevención de fallos"],
+        "en": ["Network diagnostics", "Supply optimization", "Failure prevention"],
+        "it": ["Diagnostica di rete", "Ottimizzazione forniture", "Prevenzione guasti"]
+      }
+    },
+    {
+      "id": "ag_06",
+      "name": { "es": "Economic Forecaster", "en": "Economic Forecaster", "it": "Previsore Economico" },
+      "engines": { "free": "Qwen 3 Coder 480B", "pro": "GLM 5" },
+      "tasks": {
+        "es": ["Modelado macroeconómico", "Análisis de volatilidad", "Detección de cisnes negros"],
+        "en": ["Macroeconomic modeling", "Volatility analysis", "Black swan detection"],
+        "it": ["Modellazione macro", "Analisi volatilità", "Rilevamento cigni neri"]
+      }
+    },
+    {
+      "id": "ag_07",
+      "name": { "es": "Tax Optimizer", "en": "Tax Optimizer", "it": "Ottimizzatore Fiscale" },
+      "engines": { "free": "DeepSeek R1 0528", "pro": "Qwen 3.5 397B" },
+      "tasks": {
+        "es": ["Ingeniería fiscal legal", "Estructuras internacionales", "Auditoría preventiva"],
+        "en": ["Legal tax engineering", "International structures", "Preventive audit"],
+        "it": ["Ingegneria fiscale legale", "Strutture internazionali", "Audit preventivo"]
+      }
+    },
+    {
+      "id": "ag_08",
+      "name": { "es": "Financial Architect", "en": "Financial Architect", "it": "Architetto Finanziario" },
+      "engines": { "free": "MiMo-V2-Flash", "pro": "Grok 4.1 Fast" },
+      "tasks": {
+        "es": ["Diseño de carteras IP", "Estructuración de riqueza", "Algoritmos de balanceo"],
+        "en": ["IP portfolio design", "Wealth structuring", "Balancing algorithms"],
+        "it": ["Design portafoglio IP", "Strutturazione ricchezza", "Algoritmi di bilanciamento"]
+      }
+    },
+    {
+      "id": "ag_09",
+      "name": { "es": "Liquidity Guardian", "en": "Liquidity Guardian", "it": "Guardiano Liquidità" },
+      "engines": { "free": "Z.ai GLM 4.5 Air", "pro": "Claude 4.6 Sonnet" },
+      "tasks": {
+        "es": ["Monitoreo de flujo caja", "Planes de contingencia", "Gestión de tesorería"],
+        "en": ["Cash flow monitoring", "Contingency plans", "Treasury management"],
+        "it": ["Monitoraggio cash flow", "Piani di contingenza", "Gestione tesoreria"]
+      }
+    },
+    {
+      "id": "ag_10",
+      "name": { "es": "Astute Negotiator", "en": "Astute Negotiator", "it": "Negoziatore Astuto" },
+      "engines": { "free": "Devstral 2", "pro": "Claude 4.6 Opus" },
+      "tasks": {
+        "es": ["Simulación teoría juegos", "Análisis psicológico", "Optimización cláusulas"],
+        "en": ["Game theory simulation", "Psychological analysis", "Clause optimization"],
+        "it": ["Simulazione teoria giochi", "Analisi psicologica", "Ottimizzazione clausole"]
+      }
+    },
+    {
+      "id": "ag_11",
+      "name": { "es": "Opportunity Hunter", "en": "Opportunity Hunter", "it": "Cacciatore Opportunità" },
+      "engines": { "free": "Qwen 3 Next 80B", "pro": "MiniMax M2.5" },
+      "tasks": {
+        "es": ["Rastreo de arbitraje", "Identificación startups", "Alertas de inversión"],
+        "en": ["Arbitrage tracking", "Startup identification", "Investment alerts"],
+        "it": ["Tracking arbitraggio", "Identificazione startup", "Avvisi investimento"]
+      }
+    },
+    {
+      "id": "ag_12",
+      "name": { "es": "Project Coordinator", "en": "Project Coordinator", "it": "Coordinatore Progetti" },
+      "engines": { "free": "StepFun 3.5 Flash", "pro": "Kimi K2.5" },
+      "tasks": {
+        "es": ["Orquestación agéntica", "Resolución cuellos botella", "Sincronización dinámica"],
+        "en": ["Agentic orchestration", "Bottleneck resolution", "Dynamic sync"],
+        "it": ["Orchestrazione agenti", "Risoluzione colli bottiglia", "Sincronizzazione dinamica"]
+      }
+    },
+    {
+      "id": "ag_13",
+      "name": { "es": "Personalized Advisor", "en": "Personalized Advisor", "it": "Consulente Personale" },
+      "engines": { "free": "Llama 3.3 70B", "pro": "Claude 4.6 Opus" },
+      "tasks": {
+        "es": ["Coaching ADN usuario", "Resolución de dilemas", "Planes de crecimiento"],
+        "en": ["User DNA coaching", "Dilemma resolution", "Growth plans"],
+        "it": ["Coaching DNA utente", "Risoluzione dilemmi", "Piani di crescita"]
+      }
+    },
+    {
+      "id": "ag_14",
+      "name": { "es": "Risk Simulator", "en": "Risk Simulator", "it": "Simulatore di Rischio" },
+      "engines": { "free": "DeepSeek R1 0528", "pro": "DeepSeek V3.2" },
+      "tasks": {
+        "es": ["Simulación Monte Carlo", "Análisis peor escenario", "Evaluación sistémica"],
+        "en": ["Monte Carlo simulation", "Worst-case analysis", "Systemic evaluation"],
+        "it": ["Simulazione Monte Carlo", "Analisi scenario peggiore", "Valutazione sistemica"]
+      }
+    },
+    {
+      "id": "ag_15",
+      "name": { "es": "Tokenization Engineer", "en": "Tokenization Engineer", "it": "Ingegnere Tokenizzazione" },
+      "engines": { "free": "Qwen 3 Coder 480B", "pro": "Qwen 3.5 Plus" },
+      "tasks": {
+        "es": ["Conversión activos RWA", "Lógica Smart Contracts", "Ingeniería de seguridad"],
+        "en": ["RWA asset conversion", "Smart Contract logic", "Security engineering"],
+        "it": ["Conversione asset RWA", "Logica Smart Contracts", "Ingegneria sicurezza"]
+      }
+    },
+    {
+      "id": "ag_16",
+      "name": { "es": "Exit Strategist", "en": "Exit Strategist", "it": "Stratega d'Uscita" },
+      "engines": { "free": "Arcee Trinity Large", "pro": "GPT-5.2 mini" },
+      "tasks": {
+        "es": ["Planificación M&A/IPO", "Ajustes de valor salida", "Estructuras de retiro"],
+        "en": ["M&A/IPO planning", "Exit value adjustment", "Withdrawal structures"],
+        "it": ["Pianificazione M&A/IPO", "Aggiustamento valore", "Strutture di ritiro"]
+      }
+    },
+    {
+      "id": "ag_17",
+      "name": { "es": "Legal Tracker", "en": "Legal Tracker", "it": "Tracker Legale" },
+      "engines": { "free": "Z.ai GLM 4.5 Air", "pro": "Claude 4.6 Sonnet" },
+      "tasks": {
+        "es": ["Monitoreo legislativo", "Síntesis jurisprudencia", "Auditoría contractual"],
+        "en": ["Legislative monitoring", "Case law synthesis", "Contract audit"],
+        "it": ["Monitoraggio legislativo", "Sintesi giurisprudenza", "Audit contrattuale"]
+      }
+    },
+    {
+      "id": "ag_18",
+      "name": { "es": "Zoning Cartographer", "en": "Zoning Cartographer", "it": "Cartografo Zonale" },
+      "engines": { "free": "Gemini 2.0 Flash", "pro": "Gemini 2.5 Pro" },
+      "tasks": {
+        "es": ["Análisis de uso suelo", "Mapeo de regulaciones", "Identificación permisos"],
+        "en": ["Land use analysis", "Regulation mapping", "Permit identification"],
+        "it": ["Analisi uso suolo", "Mappatura regolamenti", "Identificazione permessi"]
+      }
+    },
+    {
+      "id": "ag_19",
+      "name": { "es": "Field Agent", "en": "Field Agent", "it": "Agente sul Campo" },
+      "engines": { "free": "MiMo-V2-Flash", "pro": "Mistral Large 3" },
+      "tasks": {
+        "es": ["Procesamiento datos crudos", "Validación multi-fuente", "Reportes tácticos"],
+        "en": ["Raw data processing", "Multi-source validation", "Tactical reports"],
+        "it": ["Elaborazione dati grezzi", "Validazione multi-fonte", "Report tattici"]
+      }
+    },
+    {
+      "id": "ag_20",
+      "name": { "es": "Investor Concierge", "en": "Investor Concierge", "it": "Concierge Investitori" },
+      "engines": { "free": "DeepSeek R1 0528", "pro": "Claude 4.6 Sonnet" },
+      "tasks": {
+        "es": ["Gestión relaciones LP", "Reporting de alto nivel", "Automatización pitch decks"],
+        "en": ["LP relations management", "High-level reporting", "Pitch deck automation"],
+        "it": ["Gestione relazioni LP", "Reporting di alto livello", "Automazione pitch deck"]
+      }
+    }
+  ],
+  "ui": {
+    "es": {
+      "sidebar.title": "The Squad",
+      "sidebar.subtitle": "Motor Agéntico",
+      "modal.tasks": "Especialización",
+      "modal.engine": "Motor de IA",
+      "modal.free": "FREE",
+      "modal.pro": "PRO",
+      "modal.upgrade": "UPGRADE TO PRO",
+      "modal.active_engine": "Motor Activo",
+      "badge.pro": "PRO"
+    },
+    "en": {
+      "sidebar.title": "The Squad",
+      "sidebar.subtitle": "Agentic Engine",
+      "modal.tasks": "Specialization",
+      "modal.engine": "AI Engine",
+      "modal.free": "FREE",
+      "modal.pro": "PRO",
+      "modal.upgrade": "UPGRADE TO PRO",
+      "modal.active_engine": "Active Engine",
+      "badge.pro": "PRO"
+    },
+    "it": {
+      "sidebar.title": "The Squad",
+      "sidebar.subtitle": "Motore Agenti",
+      "modal.tasks": "Specializzazione",
+      "modal.engine": "Motore IA",
+      "modal.free": "FREE",
+      "modal.pro": "PRO",
+      "modal.upgrade": "UPGRADE TO PRO",
+      "modal.active_engine": "Motore Attivo",
+      "badge.pro": "PRO"
+    }
+  }
+}

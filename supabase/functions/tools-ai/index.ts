@@ -1,0 +1,133 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
+type ToolKey =
+  | 'deep_research'
+  | 'create_video_brief'
+  | 'create_music_brief'
+  | 'canvas_organize'
+  | 'generate_report'
+  | 'market_analysis'
+  | 'prompt_engineer'
+  | 'project_metrics';
+
+const SYSTEMS: Record<ToolKey, { system: string; model: string; max: number }> = {
+  deep_research: {
+    model: 'google/gemini-2.5-pro',
+    max: 2400,
+    system: `Eres "Deep Research" de EQuityLabs. Realizas investigación rigurosa: contexto, hechos clave, actores, datos cuantitativos cuando aplique, contraargumentos, referencias y conclusiones accionables. Estructura en Markdown con secciones: Resumen Ejecutivo, Hallazgos, Datos Clave, Riesgos/Contradicciones, Próximos Pasos. Termina con: *🤖 Modelo: gemini-2.5-pro*.`,
+  },
+  create_video_brief: {
+    model: 'google/gemini-3-flash-preview',
+    max: 1500,
+    system: `Eres director creativo de video. Convierte la idea del usuario en un brief profesional de producción: Logline, Audiencia, Tono, Estructura escena por escena (con duración estimada), Estilo visual, Música/SFX, CTA. Formato Markdown. Termina con: *🤖 Modelo: gemini-3-flash-preview*.`,
+  },
+  create_music_brief: {
+    model: 'google/gemini-2.5-flash',
+    max: 1200,
+    system: `Eres productor musical. Convierte la idea en un brief musical detallado listo para enviar a Suno/Udio/MusicGen: Género, BPM, Tonalidad, Instrumentación, Estructura (Intro/Verse/Chorus/Bridge/Outro con compases), Mood, Referencias, Letras (si aplica). Formato Markdown. Termina con: *🤖 Modelo: gemini-2.5-flash*.`,
+  },
+  canvas_organize: {
+    model: 'google/gemini-2.5-flash',
+    max: 1500,
+    system: `Eres asistente de Canvas. Toma las notas/ideas crudas del usuario y devuelve un canvas estructurado: Mapa mental jerárquico en Markdown (con #, ##, ###), conexiones entre conceptos y bloques destacados. Termina con: *🤖 Modelo: gemini-2.5-flash*.`,
+  },
+  generate_report: {
+    model: 'google/gemini-2.5-pro',
+    max: 2400,
+    system: `Eres analista senior de EQuityLabs. Genera un reporte ejecutivo completo en Markdown sobre el tema indicado: Portada (título + fecha), Resumen Ejecutivo, Contexto, Análisis Detallado (con sub-secciones), Métricas/KPIs sugeridos, Recomendaciones priorizadas, Conclusión. Termina con: *🤖 Modelo: gemini-2.5-pro*.`,
+  },
+  market_analysis: {
+    model: 'google/gemini-2.5-pro',
+    max: 2400,
+    system: `Eres analista de mercado de EQuityLabs. Analiza el mercado/empresa/sector indicado: Tamaño y crecimiento (TAM/SAM/SOM), Competidores principales, Tendencias macro, Oportunidades, Amenazas, Recomendación estratégica. Markdown con tablas cuando aplique. Termina con: *🤖 Modelo: gemini-2.5-pro*.`,
+  },
+  prompt_engineer: {
+    model: 'google/gemini-3-flash-preview',
+    max: 1200,
+    system: `Eres Prompt Engineer experto. Reescribe la idea del usuario como un prompt de IA óptimo siguiendo el framework: ROL + OBJETIVO + CONTEXTO + RESTRICCIONES + FORMATO DE SALIDA + EJEMPLO. Devuelve solo el prompt final en bloque \`\`\`. Termina con: *🤖 Modelo: gemini-3-flash-preview*.`,
+  },
+  project_metrics: {
+    model: 'google/gemini-2.5-pro',
+    max: 2000,
+    system: `Eres analista de proyectos de EQuityLabs. Genera un dashboard de métricas del proyecto en Markdown: KPIs principales (con valores objetivo), Velocidad/Burndown, Milestones, Riesgos operativos, Métricas de calidad, Recomendaciones tácticas. Usa tablas. Termina con: *🤖 Modelo: gemini-2.5-pro*.`,
+  },
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  try {
+    const { tool, prompt } = await req.json() as { tool: ToolKey; prompt: string };
+
+    if (!tool || !SYSTEMS[tool]) {
+      return new Response(JSON.stringify({ error: 'Tool inválido' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!prompt || typeof prompt !== 'string' || prompt.length > 4000) {
+      return new Response(JSON.stringify({ error: 'Prompt inválido (max 4000 chars)' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const apiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'AI no configurado' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const cfg = SYSTEMS[tool];
+
+    const resp = await fetch(AI_GATEWAY_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: 'system', content: cfg.system },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: cfg.max,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error('tools-ai error', resp.status, text);
+      if (resp.status === 429) {
+        return new Response(JSON.stringify({ error: 'Límite alcanzado, intenta de nuevo en un minuto.' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (resp.status === 402) {
+        return new Response(JSON.stringify({ error: 'Créditos AI agotados.' }), {
+          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ error: 'Fallo AI' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const data = await resp.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    return new Response(JSON.stringify({ content, model: cfg.model }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    console.error('tools-ai exception', e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'Error desconocido' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
