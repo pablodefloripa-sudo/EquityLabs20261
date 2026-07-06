@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, MicOff, Send, Paperclip, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, Paperclip } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { VoiceWaveform } from './VoiceWaveform';
 import { useVoiceCommands } from '@/hooks/useVoiceCommands';
 import { useAIChat } from '@/hooks/useAIChat';
-import { useKokoroTTS } from '@/hooks/useKokoroTTS';
 
 interface Message {
   id: string;
@@ -24,7 +23,6 @@ interface GlassCockpitProps {
 export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { isListening, toggleListening, transcript, isSupported: voiceSupported } = useVoiceCommands({
@@ -34,11 +32,8 @@ export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
   });
   
   const { sendMessage, isLoading: aiLoading } = useAIChat();
-  const { speak, isSpeaking, isReady: ttsReady, isLoading: ttsLoading, stop: stopSpeaking } = useKokoroTTS();
-
   // Determine waveform state
   const getWaveformState = (): 'idle' | 'thinking' | 'speaking' => {
-    if (isSpeaking) return 'speaking';
     if (aiLoading) return 'thinking';
     return 'idle';
   };
@@ -95,10 +90,6 @@ export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      // Speak the response if TTS is ready and sound is enabled
-      if (ttsReady && soundEnabled) {
-        await speak(response);
-      }
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -116,13 +107,6 @@ export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const toggleSound = () => {
-    if (isSpeaking) {
-      stopSpeaking();
-    }
-    setSoundEnabled(!soundEnabled);
   };
 
   return (
@@ -167,12 +151,6 @@ export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
                   <p className="text-muted-foreground/60 text-sm">
                     Sistema de comunicación inmersivo activado
                   </p>
-                  {ttsLoading && (
-                    <p className="text-white/50 text-xs mt-4 flex items-center justify-center gap-2">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Cargando motor de voz...
-                    </p>
-                  )}
                 </motion.div>
               </div>
             ) : (
@@ -211,24 +189,6 @@ export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
         {/* Fixed input area at bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-6">
           <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md rounded-2xl p-3 border border-white/10">
-            {/* Sound toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSound}
-              className={`h-10 w-10 rounded-xl transition-all duration-300 ${
-                soundEnabled
-                  ? 'text-[#FF4500] bg-[#FF4500]/10 hover:bg-[#FF4500]/20 shadow-[0_0_15px_rgba(255,69,0,0.3)]'
-                  : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-white/5'
-              }`}
-            >
-              {soundEnabled ? (
-                <Volume2 className="w-5 h-5" />
-              ) : (
-                <VolumeX className="w-5 h-5" />
-              )}
-            </Button>
-
             {/* Input field */}
             <Input
               value={inputValue}

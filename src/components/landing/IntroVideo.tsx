@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, SkipForward } from 'lucide-react';
+import { SkipForward } from 'lucide-react';
 
 interface Props {
   src: string;
@@ -15,7 +15,6 @@ interface Props {
  */
 export const IntroVideo = ({ src, onEnded }: Props) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
   const [hidden, setHidden] = useState(false);
 
   const captureLastFrame = (): string | null => {
@@ -61,23 +60,11 @@ export const IntroVideo = ({ src, onEnded }: Props) => {
     const handleEnd = () => finish();
     v.addEventListener('ended', handleEnd);
 
-    // Try unmuted autoplay; gracefully fall back to muted if blocked.
-    v.muted = false;
-    v.play().then(() => setMuted(false)).catch(() => {
-      v.muted = true;
-      setMuted(true);
-      v.play().catch(() => {});
-    });
+    v.muted = true;
+    v.play().catch(() => {});
     return () => v.removeEventListener('ended', handleEnd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const toggleMute = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    setMuted(v.muted);
-  };
 
   if (hidden) return null;
 
@@ -88,6 +75,7 @@ export const IntroVideo = ({ src, onEnded }: Props) => {
         src={src}
         playsInline
         autoPlay
+        muted
         preload="auto"
         crossOrigin="anonymous"
         disablePictureInPicture
@@ -108,13 +96,6 @@ export const IntroVideo = ({ src, onEnded }: Props) => {
           transition={{ duration: 0.5 }}
           className="absolute bottom-6 right-6 z-50 flex gap-2"
         >
-          <button
-            onClick={toggleMute}
-            className="w-10 h-10 rounded-full bg-black/60 border border-cyan-400/40 text-cyan-300 flex items-center justify-center hover:border-cyan-300 transition-colors"
-            aria-label={muted ? 'Unmute' : 'Mute'}
-          >
-            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
           <button
             onClick={finish}
             className="px-4 h-10 rounded-full bg-black/60 border border-cyan-400/40 text-cyan-300 text-xs font-mono tracking-wider flex items-center gap-2 hover:border-cyan-300 transition-colors"

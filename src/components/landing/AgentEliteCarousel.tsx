@@ -73,8 +73,8 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
     <div className="flex flex-col h-screen w-full overflow-hidden relative">
       {/* Background is provided by the intro video underneath */}
 
-      {/* Ghost Typer - top 15% */}
-      <div className="relative z-20 h-[15vh] flex items-center justify-center">
+      {/* Ghost Typer */}
+      <div className="relative z-20 h-[24vh] min-h-[190px] flex items-center justify-center">
         <GhostTyper
           text={phrases[activeIndex % phrases.length]}
           isActive={true}
@@ -82,7 +82,7 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
         />
       </div>
 
-      {/* Carousel area - 85% */}
+      {/* Carousel area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4">
         {/* Cards */}
         <div className="relative w-full max-w-7xl h-[640px] flex items-center justify-center">

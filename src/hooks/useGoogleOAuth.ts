@@ -21,10 +21,8 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
   // Función para iniciar OAuth con Google
   const connectGoogle = useCallback(async () => {
     try {
-      // IMPORTANT: redirect to a public route so the OAuth callback can complete
-      // before any authenticated-route guards run.
-      const redirectUrl = `${window.location.origin}/auth`;
-      
+      const redirectTo = new URL('auth', `${window.location.origin}${import.meta.env.BASE_URL}`).toString();
+
       // Detectar si estamos en dominio custom
       const isCustomDomain =
         !window.location.hostname.includes('lovable.app') &&
@@ -34,7 +32,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: redirectUrl,
+            redirectTo,
             skipBrowserRedirect: true,
             scopes: GOOGLE_SCOPES,
             queryParams: {
@@ -54,7 +52,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: redirectUrl,
+            redirectTo,
             scopes: GOOGLE_SCOPES,
             queryParams: {
               access_type: 'offline',

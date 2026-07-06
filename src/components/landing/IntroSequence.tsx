@@ -10,7 +10,7 @@ interface Props {
 }
 
 const SLIDE_COUNT = 5;
-const AUTO_MS = 7000;
+const AUTO_MS = 5200;
 
 // Languages with their own slide set. Others fall back to en via onError.
 const HAS_OWN_SLIDES: Partial<Record<LandingLang, boolean>> = {

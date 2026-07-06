@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Volume2, VolumeX, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus } from 'lucide-react';
+import { Zap, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus } from 'lucide-react';
 import { InlineToolsPanel } from './InlineToolsPanel';
 import { AgentResponsePanel } from './AgentResponsePanel';
 import { MascotGreeting } from './MascotGreeting';
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { VoiceWaveform } from './VoiceWaveform';
 
 import { useAIChat } from '@/hooks/useAIChat';
-import { useKokoroTTS } from '@/hooks/useKokoroTTS';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,7 +57,6 @@ const StatusLEDs = ({ isThinking }: { isThinking: boolean }) => (
 export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
   const [mascotTask, setMascotTask] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -68,10 +66,7 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   const { toast } = useToast();
   
   const { sendMessage, isLoading: aiLoading } = useAIChat();
-  const { speak, isSpeaking, isReady: ttsReady, stop: stopSpeaking } = useKokoroTTS();
-
   const getWaveformState = (): 'idle' | 'thinking' | 'speaking' => {
-    if (isSpeaking) return 'speaking';
     if (aiLoading) return 'thinking';
     return 'idle';
   };
@@ -214,9 +209,6 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
       setMessages(prev => [...prev, assistantMessage]);
       forceFocus();
 
-      if (ttsReady && soundEnabled) {
-        await speak(response);
-      }
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
@@ -235,12 +227,6 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const toggleSound = () => {
-    if (isSpeaking) stopSpeaking();
-    setSoundEnabled(!soundEnabled);
-    forceFocus();
   };
 
   return (
@@ -384,19 +370,6 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={toggleSound}
-                className={`h-8 w-8 rounded-xl transition-all duration-300 ${
-                  soundEnabled
-                    ? 'text-primary bg-primary/10 hover:bg-primary/20'
-                    : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/20'
-                }`}
-              >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => setToolsOpen(v => !v)}
                 title="Centro de Herramientas"
                 className={`h-8 w-8 rounded-xl transition-all duration-300 border ${
@@ -451,7 +424,6 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
             const history = messages.map(m => ({ role: m.role, content: m.content }));
             const response = await sendMessage(task, history);
             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: response, timestamp: new Date() }]);
-            if (ttsReady && soundEnabled) await speak(response);
           } catch (e) {
             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: t('chat.error'), timestamp: new Date() }]);
           }

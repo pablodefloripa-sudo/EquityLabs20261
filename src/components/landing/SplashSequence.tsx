@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Globe, ChevronDown } from 'lucide-react';
@@ -118,126 +118,6 @@ const ctaLabels: Record<LandingLang, string> = {
   fr: 'Commencer', de: 'Hier Starten', pl: 'Zacznij Tutaj', nl: 'Start Hier',
 };
 
-// Futuristic typing sound synthesizer (Web Audio API, no assets needed)
-let _audioCtx: AudioContext | null = null;
-const getAudioCtx = (): AudioContext | null => {
-  if (typeof window === 'undefined') return null;
-  if (!_audioCtx) {
-    const Ctx = (window.AudioContext || (window as any).webkitAudioContext);
-    if (!Ctx) return null;
-    try { _audioCtx = new Ctx(); } catch { return null; }
-  }
-  if (_audioCtx?.state === 'suspended') _audioCtx.resume().catch(() => {});
-  return _audioCtx;
-};
-
-// Background electronic ambience (drone + random bleeps + data pulses)
-type Ambience = { stop: () => void };
-
-const startElectronicAmbience = (): Ambience | null => {
-  const ctx = getAudioCtx();
-  if (!ctx) return null;
-  const now = ctx.currentTime;
-
-  const master = ctx.createGain();
-  master.gain.setValueAtTime(0.0001, now);
-  master.gain.exponentialRampToValueAtTime(0.18, now + 1.2);
-  master.connect(ctx.destination);
-
-  // Low drone (two detuned saws through lowpass)
-  const droneFilter = ctx.createBiquadFilter();
-  droneFilter.type = 'lowpass';
-  droneFilter.frequency.value = 420;
-  droneFilter.Q.value = 6;
-  const droneGain = ctx.createGain();
-  droneGain.gain.value = 0.35;
-  const oscA = ctx.createOscillator();
-  oscA.type = 'sawtooth';
-  oscA.frequency.value = 55;
-  const oscB = ctx.createOscillator();
-  oscB.type = 'sawtooth';
-  oscB.frequency.value = 55.4;
-  oscA.connect(droneFilter);
-  oscB.connect(droneFilter);
-  droneFilter.connect(droneGain);
-  droneGain.connect(master);
-  oscA.start(now);
-  oscB.start(now);
-
-  // Slow LFO sweeping the drone filter
-  const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.12;
-  const lfoGain = ctx.createGain();
-  lfoGain.gain.value = 220;
-  lfo.connect(lfoGain);
-  lfoGain.connect(droneFilter.frequency);
-  lfo.start(now);
-
-  // Hi-frequency shimmer (filtered noise)
-  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
-  const noise = ctx.createBufferSource();
-  noise.buffer = noiseBuffer;
-  noise.loop = true;
-  const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = 'highpass';
-  noiseFilter.frequency.value = 4200;
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.value = 0.04;
-  noise.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(master);
-  noise.start(now);
-
-  // Random bleeps + data pulses
-  let stopped = false;
-  const scheduleBleep = () => {
-    if (stopped) return;
-    const ctx2 = getAudioCtx();
-    if (!ctx2) return;
-    const t = ctx2.currentTime;
-    const o = ctx2.createOscillator();
-    const g = ctx2.createGain();
-    const f = ctx2.createBiquadFilter();
-    f.type = 'bandpass';
-    f.frequency.value = 1500 + Math.random() * 2200;
-    f.Q.value = 14;
-    o.type = Math.random() > 0.5 ? 'square' : 'triangle';
-    const freq = 600 + Math.random() * 1600;
-    o.frequency.setValueAtTime(freq, t);
-    o.frequency.exponentialRampToValueAtTime(freq * (0.6 + Math.random() * 0.6), t + 0.12);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.04 + Math.random() * 0.03, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.connect(f);
-    f.connect(g);
-    g.connect(master);
-    o.start(t);
-    o.stop(t + 0.22);
-    setTimeout(scheduleBleep, 180 + Math.random() * 520);
-  };
-  scheduleBleep();
-
-  return {
-    stop: () => {
-      stopped = true;
-      const ctx3 = getAudioCtx();
-      if (!ctx3) return;
-      const tEnd = ctx3.currentTime;
-      try {
-        master.gain.cancelScheduledValues(tEnd);
-        master.gain.setValueAtTime(master.gain.value, tEnd);
-        master.gain.exponentialRampToValueAtTime(0.0001, tEnd + 0.6);
-      } catch {}
-      setTimeout(() => {
-        try { oscA.stop(); oscB.stop(); lfo.stop(); noise.stop(); } catch {}
-        try { master.disconnect(); } catch {}
-      }, 800);
-    },
-  };
-};
-
 const TypewriterText = ({
   text, onDone, speed = 30, cursorClass = 'bg-blue-400',
 }: { text: string; onDone: () => void; speed?: number; cursorClass?: string }) => {
@@ -318,29 +198,6 @@ export const SplashSequence = ({ onComplete, lang, onLangChange }: SplashSequenc
   const [typingIndex, setTypingIndex] = useState(0);
   const [typingDone, setTypingDone] = useState(false);
   const navigate = useNavigate();
-  const ambienceRef = useRef<Ambience | null>(null);
-
-  // Start electronic ambience for the whole splash; ensure resume on first user gesture
-  useEffect(() => {
-    const start = () => {
-      if (!ambienceRef.current) {
-        ambienceRef.current = startElectronicAmbience();
-      } else {
-        const ctx = getAudioCtx();
-        if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
-      }
-    };
-    start();
-    const resume = () => start();
-    window.addEventListener('pointerdown', resume, { once: false });
-    window.addEventListener('keydown', resume, { once: false });
-    return () => {
-      window.removeEventListener('pointerdown', resume);
-      window.removeEventListener('keydown', resume);
-      ambienceRef.current?.stop();
-      ambienceRef.current = null;
-    };
-  }, []);
 
   // Slogan lasts 8 seconds
   useEffect(() => {

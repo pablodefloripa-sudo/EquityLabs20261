@@ -39,16 +39,16 @@ export const GhostTyper = ({ text, isActive }: GhostTyperProps) => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="w-full px-6 py-4 font-mono text-base md:text-xl lg:text-2xl tracking-wide"
+      className="w-full px-4 sm:px-6 py-4 font-mono text-2xl md:text-4xl lg:text-5xl tracking-normal"
     >
-      <div className="max-w-5xl mx-auto bg-black/50 backdrop-blur-sm rounded-lg border border-cyan-400/30 px-5 py-4" style={{ boxShadow: '0 0 25px rgba(34,211,238,0.15)' }}>
+      <div className="max-w-6xl mx-auto bg-black/50 backdrop-blur-sm rounded-lg border border-cyan-400/30 px-5 sm:px-8 py-5 sm:py-7" style={{ boxShadow: '0 0 25px rgba(34,211,238,0.15)' }}>
         <div className="flex items-center gap-2 mb-2">
           <div className="w-2 h-2 rounded-full bg-red-500/70" />
           <div className="w-2 h-2 rounded-full bg-yellow-500/70" />
           <div className="w-2 h-2 rounded-full bg-green-500/70" />
-          <span className="text-[10px] text-cyan-300/50 ml-2 font-mono">equitylabs://agent-core</span>
+          <span className="text-[10px] sm:text-xs text-cyan-300/50 ml-2 font-mono">equitylabs://agent-core</span>
         </div>
-        <div className="font-mono min-h-[2em] text-cyan-300" style={{ textShadow: '0 0 12px rgba(34,211,238,0.5)' }}>
+        <div className="font-mono min-h-[2.8em] leading-tight text-cyan-300" style={{ textShadow: '0 0 12px rgba(34,211,238,0.5)' }}>
           <span className="text-cyan-400/70 mr-2">{'>'}</span>
           <span>{displayed}</span>
           <span className={`inline-block w-[3px] h-[1em] bg-cyan-300 ml-[2px] align-middle transition-opacity ${cursorVisible ? 'opacity-100' : 'opacity-0'}`} />
