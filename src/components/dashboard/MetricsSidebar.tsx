@@ -51,7 +51,7 @@ export const MetricsSidebar = () => {
 
   return (
     <CollapsibleSidebar
-      side="left"
+      side="right"
       title={t('side.metrics')}
       icon={<BarChart3 className="w-4 h-4" />}
       tabPosition="30%"

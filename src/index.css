@@ -453,15 +453,7 @@
   }
 
   .subscription-card-float {
-    animation: subscription-card-hover 7s ease-in-out infinite;
-  }
-
-  .subscription-card-float:nth-child(2n) {
-    animation-delay: -2.4s;
-  }
-
-  .subscription-card-float:nth-child(3n) {
-    animation-delay: -4.1s;
+    animation: none;
   }
 
   @keyframes subscription-border-flicker {

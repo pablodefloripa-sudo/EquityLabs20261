@@ -5,9 +5,7 @@ import { GoogleMapsBackground } from '@/components/GoogleMapsBackground';
 import { CustomBackground } from './CustomBackground';
 import { TaskOperator } from './TaskOperator';
 import { DashboardHeader } from './DashboardHeader';
-import { DashboardSidebar } from './DashboardSidebar';
 import { MetricsSidebar } from './MetricsSidebar';
-import { AgentsSidebar } from './AgentsSidebar';
 import { CommunicationArea } from './CommunicationArea';
 import { IntegrationCenter } from './IntegrationCenter';
 import { WallpaperSelector } from './WallpaperSelector';
@@ -114,8 +112,6 @@ export const ProjectDashboard = () => {
         }}
       >
         <MetricsSidebar />
-        <DashboardSidebar />
-        <AgentsSidebar />
       </motion.div>
 
       <motion.main 

@@ -10,6 +10,7 @@ interface CollapsibleSidebarProps {
   icon: React.ReactNode;
   defaultOpen?: boolean;
   tabPosition?: string;
+  widthClassName?: string;
 }
 
 export const CollapsibleSidebar = ({
@@ -19,6 +20,7 @@ export const CollapsibleSidebar = ({
   icon,
   defaultOpen = false,
   tabPosition,
+  widthClassName = 'w-80',
 }: CollapsibleSidebarProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -79,7 +81,7 @@ export const CollapsibleSidebar = ({
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: isLeft ? -320 : 320, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className={`dashboard-neon-surface fixed top-0 bottom-0 z-30 w-80 
+              className={`dashboard-neon-surface fixed top-0 bottom-0 z-30 ${widthClassName}
                          border-cyan-400/20
                          ${isLeft ? 'left-0 border-r' : 'right-0 border-l'}`}
             >

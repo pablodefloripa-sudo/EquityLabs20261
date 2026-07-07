@@ -118,7 +118,7 @@ export const InlineToolsPanel = ({ open, onClose }: InlineToolsPanelProps) => {
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-foreground tracking-tight">Centro de Herramientas</h3>
-                  <p className="text-[9px] text-muted-foreground/70 font-mono uppercase tracking-widest">Orden operativo</p>
+                  <p className="text-[9px] text-muted-foreground/70 font-mono uppercase tracking-widest">CoreSettings</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6 text-muted-foreground hover:text-foreground">
