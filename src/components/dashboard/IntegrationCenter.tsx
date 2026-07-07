@@ -99,7 +99,7 @@ const IntegrationCard = ({
 );
 
 export const IntegrationCenter = ({ isOpen, onClose }: IntegrationCenterProps) => {
-  const { connectGoogle } = useGoogleOAuth();
+  const { connectGoogleWorkspace } = useGoogleOAuth();
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -160,12 +160,12 @@ export const IntegrationCenter = ({ isOpen, onClose }: IntegrationCenterProps) =
     }
   }, [isOpen, user?.id, loadIntegrations]);
 
-  // Conectar con Google OAuth (todos los servicios a la vez)
+  // Conectar permisos sensibles solo cuando una tarea lo justifica.
   const handleGoogleConnect = async () => {
     setIsLoadingGoogle(true);
     try {
-      await connectGoogle();
-      // No necesitamos hacer nada más aquí, el redirect manejará todo
+      await connectGoogleWorkspace();
+      // El redirect de OAuth se encarga del callback.
     } catch (error) {
       console.error('Error connecting Google:', error);
       toast({
@@ -286,7 +286,7 @@ export const IntegrationCenter = ({ isOpen, onClose }: IntegrationCenterProps) =
                   <div className="flex items-center gap-2 mb-4">
                     <ExternalLink className="w-4 h-4 text-muted-foreground" />
                     <h3 className="text-sm font-display font-medium text-foreground/80">
-                      Google OAuth
+                      Google Workspace bajo demanda
                     </h3>
                   </div>
                   
@@ -463,4 +463,3 @@ export const IntegrationCenter = ({ isOpen, onClose }: IntegrationCenterProps) =
     </>
   );
 };
-

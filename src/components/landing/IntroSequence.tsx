@@ -7,22 +7,19 @@ import { CursorTrail } from './CursorTrail';
 interface Props {
   lang: LandingLang;
   onComplete: () => void;
+  visualScale?: number;
 }
 
 const SLIDE_COUNT = 5;
 const AUTO_MS = 5200;
 
-// Languages with their own slide set. Others fall back to en via onError.
-const HAS_OWN_SLIDES: Partial<Record<LandingLang, boolean>> = {
-  en: true,
-};
-
-const slideUrl = (lang: LandingLang, idx: number) => {
-  const code = HAS_OWN_SLIDES[lang] ? lang : 'en';
+const slideUrl = (_lang: LandingLang, idx: number) => {
+  // Intro slides are English for now. Add language codes here when localized assets exist.
+  const code = 'en';
   return `/slides/${code}/${code}-${idx + 1}.jpg`;
 };
 
-export const IntroSequence = ({ lang, onComplete }: Props) => {
+export const IntroSequence = ({ lang, onComplete, visualScale = 1 }: Props) => {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -57,11 +54,12 @@ export const IntroSequence = ({ lang, onComplete }: Props) => {
           }}
           alt=""
           aria-hidden
-          initial={{ opacity: 0, scale: 1.02 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0, scale: visualScale + 0.02 }}
+          animate={{ opacity: 1, scale: visualScale }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
           className="absolute inset-0 w-full h-full object-cover"
+          style={{ transformOrigin: 'center' }}
         />
       </AnimatePresence>
 
@@ -69,10 +67,9 @@ export const IntroSequence = ({ lang, onComplete }: Props) => {
         onClick={onComplete}
         className="absolute top-4 left-4 z-30 px-3 py-1.5 rounded-full border border-cyan-500/40 bg-black/60 backdrop-blur-xl text-cyan-300 text-xs font-mono tracking-wide hover:border-cyan-400 transition-colors cursor-pointer"
       >
-        SKIP →
+        SKIP -&gt;
       </button>
 
-      {/* Prev / Next arrows */}
       <button
         onClick={() => go(-1)}
         disabled={index === 0}
@@ -89,7 +86,6 @@ export const IntroSequence = ({ lang, onComplete }: Props) => {
         <ChevronRight className="w-7 h-7" />
       </button>
 
-      {/* progress dots */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-30">
         {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
           <button

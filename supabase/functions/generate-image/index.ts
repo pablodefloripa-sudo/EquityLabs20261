@@ -1,5 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getUserPlanState, isFreePlan } from "../_shared/subscription-routing.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +20,36 @@ serve(async (req) => {
     if (!prompt || typeof prompt !== 'string' || prompt.length > 2000) {
       return new Response(JSON.stringify({ error: 'Prompt inválido (max 2000 chars)' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const authToken = authHeader.replace('Bearer ', '');
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data: { user } } = await supabase.auth.getUser(authToken);
+    const userId = user?.id;
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userPlan = await getUserPlanState(supabaseUrl, supabaseKey, userId);
+    if (isFreePlan(userPlan.plan)) {
+      return new Response(JSON.stringify({ error: 'La generacion de imagenes no esta incluida en el limite gratuito FREE.' }), {
+        status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

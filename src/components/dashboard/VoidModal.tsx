@@ -39,7 +39,6 @@ const DEFAULT_TOOLS: Tool[] = [
   { name: "Cursor", url: "https://cursor.com", category: "Otros Potentes" },
   { name: "Midjourney (Discord)", url: "https://midjourney.com", category: "Otros Potentes" },
   { name: "Meshy.ai (3D)", url: "https://meshy.ai", category: "Otros Potentes" },
-  { name: "OpenRouter", url: "https://openrouter.ai", category: "Otros Potentes" },
   { name: "Black Forest Labs (Flux)", url: "https://blackforestlabs.ai", category: "Otros Potentes" },
 ];
 

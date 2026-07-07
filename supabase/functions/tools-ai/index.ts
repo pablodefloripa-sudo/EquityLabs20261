@@ -1,5 +1,13 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  callAIWithCostControl,
+  GOOGLE_FREE_MODEL,
+  getUserPlanState,
+  isFreePlan,
+  type ChatMessage,
+} from "../_shared/subscription-routing.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,50 +86,67 @@ serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!apiKey) {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const authToken = authHeader.replace('Bearer ', '');
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data: { user } } = await supabase.auth.getUser(authToken);
+    const userId = user?.id;
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userPlan = await getUserPlanState(supabaseUrl, supabaseKey, userId);
+    const apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
+
+    if (!isFreePlan(userPlan.plan) && !apiKey) {
       return new Response(JSON.stringify({ error: 'AI no configurado' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const cfg = SYSTEMS[tool];
-
-    const resp = await fetch(AI_GATEWAY_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [
-          { role: 'system', content: cfg.system },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: cfg.max,
-        temperature: 0.7,
-      }),
+    const messages: ChatMessage[] = [
+      { role: 'system', content: cfg.system },
+      { role: 'user', content: prompt },
+    ];
+    const aiResult = await callAIWithCostControl({
+      userId,
+      plan: userPlan.plan,
+      supabaseUrl,
+      supabaseServiceRoleKey: supabaseKey,
+      gatewayUrl: AI_GATEWAY_URL,
+      paidApiKey: apiKey,
+      model: cfg.model,
+      messages,
+      maxTokens: cfg.max,
     });
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error('tools-ai error', resp.status, text);
-      if (resp.status === 429) {
-        return new Response(JSON.stringify({ error: 'Límite alcanzado, intenta de nuevo en un minuto.' }), {
-          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      if (resp.status === 402) {
-        return new Response(JSON.stringify({ error: 'Créditos AI agotados.' }), {
-          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(JSON.stringify({ error: 'Fallo AI' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (aiResult.error) {
+      return new Response(JSON.stringify({ error: aiResult.error }), {
+        status: aiResult.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const data = await resp.json();
-    const content = data?.choices?.[0]?.message?.content || '';
-    return new Response(JSON.stringify({ content, model: cfg.model }), {
+    const content = aiResult.data?.choices?.[0]?.message?.content || '';
+    return new Response(JSON.stringify({
+      content,
+      model: isFreePlan(userPlan.plan) ? GOOGLE_FREE_MODEL : cfg.model,
+      requestedModel: cfg.model,
+      provider: isFreePlan(userPlan.plan) ? 'google-free-tier' : 'paid-gateway',
+      plan: userPlan.plan,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

@@ -1,8 +1,16 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/runtime-client';
 import { useToast } from '@/hooks/use-toast';
+import { buildAuthRedirectUrl } from '@/lib/auth-redirect';
+import type { Session } from '@supabase/supabase-js';
 
-const GOOGLE_SCOPES = [
+interface UseGoogleOAuthReturn {
+  connectGoogle: () => Promise<void>;
+  connectGoogleWorkspace: () => Promise<void>;
+  handleOAuthCallback: () => Promise<boolean>;
+}
+
+const GOOGLE_WORKSPACE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/drive.readonly',
@@ -10,135 +18,209 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
 ].join(' ');
 
-interface UseGoogleOAuthReturn {
-  connectGoogle: () => Promise<void>;
-  handleOAuthCallback: () => Promise<void>;
-}
+const cleanAuthUrl = (url: URL) => {
+  url.searchParams.delete('code');
+  url.searchParams.delete('state');
+  url.searchParams.delete('error');
+  url.searchParams.delete('error_code');
+  url.searchParams.delete('error_description');
+
+  const nextUrl = `${url.pathname}${url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''}`;
+  window.history.replaceState({}, document.title, nextUrl);
+};
+
+const waitForSession = async (timeoutMs = 5000): Promise<Session | null> => {
+  const {
+    data: { session: currentSession },
+  } = await supabase.auth.getSession();
+
+  if (currentSession) {
+    return currentSession;
+  }
+
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const finish = (session: Session | null) => {
+      if (resolved) return;
+      resolved = true;
+      subscription.unsubscribe();
+      window.clearInterval(pollTimer);
+      window.clearTimeout(timeoutTimer);
+      resolve(session);
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        finish(session);
+      }
+    });
+
+    const pollTimer = window.setInterval(async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
+        finish(session);
+      }
+    }, 250);
+
+    const timeoutTimer = window.setTimeout(() => {
+      finish(null);
+    }, timeoutMs);
+  });
+};
+
+const persistGoogleIntegrations = async (session: Session) => {
+  if (!session.provider_token) {
+    return;
+  }
+
+  const providers = ['gmail', 'drive', 'calendar', 'sheets'];
+  const scopesMap: Record<string, string[]> = {
+    gmail: ['gmail.readonly', 'gmail.send'],
+    drive: ['drive.readonly'],
+    calendar: ['calendar'],
+    sheets: ['spreadsheets'],
+  };
+
+  for (const provider of providers) {
+    const { error: upsertError } = await supabase
+      .from('user_integrations')
+      .upsert(
+        {
+          user_id: session.user.id,
+          provider,
+          is_connected: true,
+          access_token_encrypted: session.provider_token,
+          refresh_token_encrypted: session.provider_refresh_token || null,
+          scopes: scopesMap[provider],
+          connected_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'user_id,provider',
+        },
+      );
+
+    if (upsertError) {
+      console.error(`Error saving ${provider} integration:`, upsertError);
+    }
+  }
+};
 
 export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
   const { toast } = useToast();
 
-  // Función para iniciar OAuth con Google
   const connectGoogle = useCallback(async () => {
     try {
-      const redirectTo = new URL('auth', `${window.location.origin}${import.meta.env.BASE_URL}`).toString();
-
-      // Detectar si estamos en dominio custom
-      const isCustomDomain =
-        !window.location.hostname.includes('lovable.app') &&
-        !window.location.hostname.includes('lovableproject.com');
-
-      if (isCustomDomain) {
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo,
-            skipBrowserRedirect: true,
-            scopes: GOOGLE_SCOPES,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: buildAuthRedirectUrl('/auth'),
+          queryParams: {
+            prompt: 'select_account',
           },
-        });
+        },
+      });
 
-        if (error) throw error;
-
-        if (data?.url) {
-          window.location.href = data.url;
-        }
-      } else {
-        // Para dominios lovable.app
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo,
-            scopes: GOOGLE_SCOPES,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
-          },
-        });
-
-        if (error) throw error;
-      }
+      if (error) throw error;
     } catch (error) {
       console.error('Error connecting to Google:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      const isMissingSecret = message.toLowerCase().includes('missing oauth secret');
+
       toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con Google. Intentá de nuevo.',
+        title: isMissingSecret ? 'Google no esta configurado en Supabase' : 'Error de conexion',
+        description: isMissingSecret
+          ? 'Falta cargar el Client Secret de Google en Auth > Providers > Google.'
+          : 'No se pudo conectar con Google. Intenta de nuevo.',
         variant: 'destructive',
       });
     }
   }, [toast]);
 
-  // Manejar callback después del OAuth
-  const handleOAuthCallback = useCallback(async () => {
+  const connectGoogleWorkspace = useCallback(async () => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: buildAuthRedirectUrl('/auth'),
+          scopes: GOOGLE_WORKSPACE_SCOPES,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
       if (error) throw error;
-      
-      if (session?.provider_token) {
-        console.log('✅ Google OAuth tokens received');
-        
-        // Guardar tokens en user_integrations manualmente (backup al trigger)
-        const providers = ['gmail', 'drive', 'calendar', 'sheets'];
-        const scopesMap: Record<string, string[]> = {
-          gmail: ['gmail.readonly', 'gmail.send'],
-          drive: ['drive.readonly'],
-          calendar: ['calendar'],
-          sheets: ['spreadsheets'],
-        };
-
-        for (const provider of providers) {
-          const { error: upsertError } = await supabase
-            .from('user_integrations')
-            .upsert({
-              user_id: session.user.id,
-              provider,
-              is_connected: true,
-              access_token_encrypted: session.provider_token,
-              refresh_token_encrypted: session.provider_refresh_token || null,
-              scopes: scopesMap[provider],
-              connected_at: new Date().toISOString(),
-            }, {
-              onConflict: 'user_id,provider',
-            });
-
-          if (upsertError) {
-            console.error(`Error saving ${provider} integration:`, upsertError);
-          }
-        }
-
-        toast({
-          title: '✅ Google conectado',
-          description: 'Gmail, Drive, Calendar y Sheets están listos.',
-        });
-      }
     } catch (error) {
-      console.error('Error handling OAuth callback:', error);
+      console.error('Error connecting Google Workspace:', error);
+      toast({
+        title: 'Permiso no iniciado',
+        description: 'No se pudo abrir la conexion con Google Workspace.',
+        variant: 'destructive',
+      });
     }
   }, [toast]);
 
-  // Verificar si venimos de un callback OAuth al montar
-  useEffect(() => {
-    const checkOAuthCallback = async () => {
+  const handleOAuthCallback = useCallback(async () => {
+    try {
+      const url = new URL(window.location.href);
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const queryParams = new URLSearchParams(window.location.search);
-      
-      // Verificar si hay tokens en la URL (callback de OAuth)
-      if (hashParams.get('access_token') || queryParams.get('code')) {
-        await handleOAuthCallback();
-        
-        // Limpiar URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+      const queryParams = new URLSearchParams(url.search);
+      const hasOAuthPayload = Boolean(hashParams.get('access_token') || queryParams.get('code'));
+      const authError =
+        queryParams.get('error_description') ||
+        queryParams.get('error') ||
+        hashParams.get('error_description') ||
+        hashParams.get('error');
+
+      if (!hasOAuthPayload) {
+        return false;
       }
-    };
 
-    checkOAuthCallback();
-  }, [handleOAuthCallback]);
+      if (authError) {
+        cleanAuthUrl(url);
+        console.error('OAuth callback returned an auth error:', authError);
+        return false;
+      }
 
-  return { connectGoogle, handleOAuthCallback };
+      if (hashParams.get('access_token') && hashParams.get('refresh_token')) {
+        const { error } = await supabase.auth.setSession({
+          access_token: hashParams.get('access_token') as string,
+          refresh_token: hashParams.get('refresh_token') as string,
+        });
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      const session = await waitForSession();
+      cleanAuthUrl(url);
+
+      if (!session) {
+        console.error('OAuth callback completed, but no active Supabase session was found.');
+        return false;
+      }
+
+      await persistGoogleIntegrations(session);
+
+      toast({
+        title: 'Google conectado',
+        description: 'La sesion se inicio correctamente y tus integraciones quedaron listas.',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error handling OAuth callback:', error instanceof Error ? error.message : error);
+      return false;
+    }
+  }, [toast]);
+
+  return { connectGoogle, connectGoogleWorkspace, handleOAuthCallback };
 };

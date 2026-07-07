@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link2, LogOut, Brain } from "lucide-react";
+import { Link2, LogOut, Brain, Search, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { VoidModal } from "./VoidModal";
@@ -11,9 +11,10 @@ interface DashboardHeaderProps {
   onHistory?: () => void;
   onExit?: () => void;
   onOpenIntegrations?: () => void;
+  onFocusConsole?: () => void;
 }
 
-export const DashboardHeader = ({ onOpenDocs, onSettings, onHistory, onExit, onOpenIntegrations }: DashboardHeaderProps = {}) => {
+export const DashboardHeader = ({ onOpenDocs, onSettings, onHistory, onExit, onOpenIntegrations, onFocusConsole }: DashboardHeaderProps = {}) => {
   const { t } = useLanguage();
   const [voidOpen, setVoidOpen] = useState(false);
 
@@ -21,7 +22,7 @@ export const DashboardHeader = ({ onOpenDocs, onSettings, onHistory, onExit, onO
     <>
     <VoidModal open={voidOpen} onOpenChange={setVoidOpen} />
     <motion.header
-      className="fixed top-0 left-0 right-0 z-50 h-14 bg-black/90 backdrop-blur-xl border-b border-cyan-400/10 flex items-center px-6"
+      className="dashboard-neon-surface fixed top-0 left-0 right-0 z-50 h-14 flex items-center px-6 bg-black/65 border-b border-cyan-400/20"
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
     >
@@ -57,6 +58,36 @@ export const DashboardHeader = ({ onOpenDocs, onSettings, onHistory, onExit, onO
 
         {/* Derecha */}
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 rounded-xl border border-cyan-400/20 bg-black/35 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50"
+              onClick={onFocusConsole}
+              title="Buscar en consola"
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50"
+              onClick={() => window.dispatchEvent(new CustomEvent('eq:response-zoom-in'))}
+              title="Agrandar ventanas"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50"
+              onClick={() => window.dispatchEvent(new CustomEvent('eq:response-zoom-out'))}
+              title="Achicar ventanas"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+          </div>
+
           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onOpenIntegrations}>
             <Link2 className="w-5 h-5" />
           </Button>

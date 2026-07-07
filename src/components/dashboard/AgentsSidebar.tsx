@@ -23,8 +23,8 @@ const AgentCard = memo(({
       onClick={onClick}
       className={`w-full text-left p-3 rounded-xl transition-all duration-200 ${
         isSelected
-          ? 'bg-primary/20 border-primary/40'
-          : 'bg-muted/30 border-border/20 hover:border-primary/20'
+          ? 'dashboard-neon-card bg-primary/18 border-primary/45 shadow-[0_0_22px_rgba(34,211,238,0.12)]'
+          : 'dashboard-neon-card border-cyan-400/15 hover:border-cyan-300/35'
       } border`}
     >
       <div className="flex items-center gap-3">
@@ -63,12 +63,23 @@ AgentCard.displayName = 'AgentCard';
 export const AgentsSidebar = memo(() => {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const { t, getAgentName, agents } = useAgentI18n();
+  const { t, getAgentName, getAgentTasks, getEngine, agents } = useAgentI18n();
 
   const handleClick = useCallback((agent: Agent) => {
+    const name = getAgentName(agent);
+    const tasks = getAgentTasks(agent);
+
     setSelectedAgent(agent);
     setModalOpen(true);
-  }, []);
+    window.dispatchEvent(new CustomEvent('eq:agent-selected', {
+      detail: {
+        id: agent.id,
+        name,
+        tasks,
+        engine: getEngine(agent, 'free'),
+      },
+    }));
+  }, [getAgentName, getAgentTasks, getEngine]);
 
   return (
     <>

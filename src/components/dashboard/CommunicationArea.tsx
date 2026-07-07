@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus } from 'lucide-react';
+import { Zap, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus, ShieldCheck } from 'lucide-react';
 import { InlineToolsPanel } from './InlineToolsPanel';
 import { AgentResponsePanel } from './AgentResponsePanel';
 import { MascotGreeting } from './MascotGreeting';
@@ -22,6 +22,10 @@ interface Message {
   toolLabel?: string;
   reaction?: 'up' | 'down' | null;
   mascot?: boolean;
+  agentCommand?: {
+    agentName: string;
+    proposals: string[];
+  };
 }
 
 interface CommunicationAreaProps {
@@ -54,12 +58,49 @@ const StatusLEDs = ({ isThinking }: { isThinking: boolean }) => (
   </div>
 );
 
+const buildAgentCommand = (agentName: string, tasks: string[], engine: string) => {
+  const safeTasks = tasks.length ? tasks : ['Buscar norte estrategico', 'Implementar agentes necesarios', 'Auditar rendimiento y permisos'];
+  const proposals = [
+    `Buscar norte: diagnosticar objetivo, restricciones, oportunidad y primer indicador de exito para ${agentName}.`,
+    `Implementar squad: activar ${agentName} como agente lider y sumar agentes de soporte segun proyecto, permisos y riesgo.`,
+    `Control operativo: abrir proyecto con metricas de rendimiento, auditoria, permisos del usuario y checkpoints de avance.`,
+  ];
+
+  return {
+    proposals,
+    prompt: [
+      `Ejecucion inmediata con ${agentName}.`,
+      `Motor inicial: ${engine}.`,
+      '',
+      `Contexto del agente: ${safeTasks.join(' | ')}`,
+      '',
+      'Objetivo: encontrar el norte estrategico del usuario, proponer el squad minimo de agentes, abrir un proyecto operativo, definir metricas de rendimiento, auditoria, control y permisos requeridos.',
+      '',
+      'Empeza por la propuesta 1 salvo que el usuario elija otra.',
+    ].join('\n'),
+    content: [
+      `**${agentName} listo para operar.**`,
+      '',
+      'Ya entiendo que este agente fue elegido como punto de entrada. No voy a pedir Gmail, Drive, Calendar o Sheets hasta que una accion concreta lo necesite.',
+      '',
+      '**Tres propuestas de trabajo inmediato:**',
+      '',
+      `1. ${proposals[0]}`,
+      `2. ${proposals[1]}`,
+      `3. ${proposals[2]}`,
+      '',
+      '**Arquitectura de ejecucion:** norte estrategico, agentes necesarios, proyecto abierto, metricas, auditoria, control y permisos bajo demanda.',
+    ].join('\n'),
+  };
+};
+
 export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [mascotTask, setMascotTask] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [responseScale, setResponseScale] = useState(1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguage();
@@ -77,6 +118,53 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   }, []);
 
   useEffect(() => { forceFocus(); }, [forceFocus]);
+
+  useEffect(() => {
+    const handleFocusConsole = () => forceFocus();
+    window.addEventListener('eq:focus-console', handleFocusConsole);
+    return () => window.removeEventListener('eq:focus-console', handleFocusConsole);
+  }, [forceFocus]);
+
+  useEffect(() => {
+    const zoomIn = () => setResponseScale(value => Math.min(1.45, Number((value + 0.08).toFixed(2))));
+    const zoomOut = () => setResponseScale(value => Math.max(0.86, Number((value - 0.08).toFixed(2))));
+
+    window.addEventListener('eq:response-zoom-in', zoomIn);
+    window.addEventListener('eq:response-zoom-out', zoomOut);
+    return () => {
+      window.removeEventListener('eq:response-zoom-in', zoomIn);
+      window.removeEventListener('eq:response-zoom-out', zoomOut);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleAgentSelected = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        name?: string;
+        tasks?: string[];
+        engine?: string;
+      }>).detail || {};
+      const agentName = detail.name || 'Agente';
+      const command = buildAgentCommand(agentName, detail.tasks || [], detail.engine || 'FREE');
+
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: command.content,
+        timestamp: new Date(),
+        model: detail.engine || 'agent-router',
+        agentCommand: {
+          agentName,
+          proposals: command.proposals,
+        },
+      }]);
+      setInputValue(command.prompt);
+      forceFocus();
+    };
+
+    window.addEventListener('eq:agent-selected', handleAgentSelected);
+    return () => window.removeEventListener('eq:agent-selected', handleAgentSelected);
+  }, [forceFocus]);
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -211,6 +299,12 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
 
     } catch (error) {
       console.error('Error sending message:', error);
+      const errorMessageText = error instanceof Error ? error.message : 'Error desconocido';
+      toast({
+        title: 'AI no disponible',
+        description: errorMessageText,
+        variant: 'destructive',
+      });
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -220,6 +314,24 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
       setMessages(prev => [...prev, errorMessage]);
       forceFocus();
     }
+  };
+
+  const requestIntegration = (provider: string, reason: string) => {
+    setMessages(prev => [...prev, {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: [
+        `**Permiso requerido: ${provider}.**`,
+        '',
+        reason,
+        '',
+        'Voy a abrir el centro de integraciones para que confirmes el acceso. Sin confirmacion, el agente trabaja con datos manuales o archivos cargados por vos.',
+      ].join('\n'),
+      timestamp: new Date(),
+      model: 'permission-router',
+    }]);
+    window.dispatchEvent(new CustomEvent('eq:open-integration-center', { detail: { provider, reason } }));
+    forceFocus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -266,7 +378,44 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
                           <img src={msg.imageUrl} alt={msg.toolLabel || 'Imagen'} className="w-full max-w-xl rounded-xl" />
                         </div>
                       ) : (
-                        <AgentResponsePanel content={msg.content} model={msg.model} mascot={msg.mascot} />
+                        <>
+                          <AgentResponsePanel
+                            content={msg.content}
+                            model={msg.model}
+                            mascot={msg.mascot}
+                            responseScale={responseScale}
+                            isThinking={aiLoading}
+                          />
+                          {msg.agentCommand && (
+                            <div className="mt-2 rounded-2xl border border-cyan-400/20 bg-black/45 p-3 backdrop-blur-xl">
+                              <div className="mb-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-300/75">
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                                Permisos bajo demanda
+                              </div>
+                              <div className="grid gap-2 md:grid-cols-3">
+                                {msg.agentCommand.proposals.map((proposal, proposalIndex) => (
+                                  <button
+                                    key={proposal}
+                                    onClick={() => {
+                                      setInputValue(`Ejecutar propuesta ${proposalIndex + 1} con ${msg.agentCommand?.agentName}: ${proposal}`);
+                                      forceFocus();
+                                    }}
+                                    className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-left text-[11px] leading-snug text-cyan-50/80 transition hover:border-cyan-300/45 hover:bg-cyan-400/10"
+                                  >
+                                    <span className="mb-1 block font-mono text-cyan-300">0{proposalIndex + 1}</span>
+                                    {proposal}
+                                  </button>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => requestIntegration('Google Workspace', 'Esta ejecucion necesita Gmail, Drive, Calendar o Sheets para leer datos reales y accionar con permiso explicito.')}
+                                className="mt-2 rounded-lg border border-fuchsia-300/25 bg-fuchsia-400/10 px-3 py-1.5 text-[11px] font-medium text-fuchsia-100 transition hover:border-fuchsia-200/45 hover:bg-fuchsia-400/15"
+                              >
+                                Conectar permisos si hacen falta
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                       {/* Footer outside the box: model + reactions + delete */}
                       {!(msg.mascot && !msg.content) && (

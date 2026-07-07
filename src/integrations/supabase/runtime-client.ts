@@ -143,6 +143,7 @@ if (!hasSupabaseConfig) {
 export const supabase = hasSupabaseConfig
   ? createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
+        flowType: "pkce",
         storage: localStorage,
         persistSession: true,
         autoRefreshToken: true,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/runtime-client';
 import { User, Session } from '@supabase/supabase-js';
+import { buildAuthRedirectUrl } from '@/lib/auth-redirect';
 
 interface AuthState {
   user: User | null;
@@ -30,35 +31,15 @@ export const useAuth = () => {
       }
     );
 
-    // THEN handle OAuth code exchange (PKCE) + get initial session
+    // Then read the initial session state.
     const init = async () => {
-      try {
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get('code');
-
-        // If we returned from an OAuth provider, finalize the sign-in by exchanging the code.
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            // Avoid logging tokens/codes; keep it minimal.
-            console.error('OAuth code exchange failed');
-          }
-
-          // Clean up URL (remove code/state) after processing.
-          url.searchParams.delete('code');
-          url.searchParams.delete('state');
-          const nextUrl = `${url.pathname}${url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''}${url.hash}`;
-          window.history.replaceState({}, document.title, nextUrl);
-        }
-      } finally {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
-        setAuthState({
-          user: session?.user ?? null,
-          session,
-          isLoading: false,
-        });
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      setAuthState({
+        user: session?.user ?? null,
+        session,
+        isLoading: false,
+      });
     };
 
     init();
@@ -83,7 +64,7 @@ export const useAuth = () => {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: buildAuthRedirectUrl('/auth'),
       },
     });
     if (error) throw error;

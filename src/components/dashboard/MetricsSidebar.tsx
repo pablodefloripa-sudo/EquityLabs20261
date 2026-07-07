@@ -28,7 +28,7 @@ const MetricItem = ({
   const trendIcons = { up: '↑', down: '↓', stable: '→' };
 
   return (
-    <div className="p-3 rounded-xl bg-muted/30 border border-border/20 hover:border-primary/20 transition-colors">
+    <div className="dashboard-neon-card p-3 rounded-xl border border-cyan-400/15 hover:border-cyan-300/35 transition-colors">
       <div className="flex items-center gap-2 mb-2">
         <Icon className="w-4 h-4 text-primary" />
         <span className="text-xs text-muted-foreground font-display">{title}</span>
@@ -71,10 +71,10 @@ export const MetricsSidebar = () => {
 
         <div className="space-y-3 pt-2">
           <h4 className="text-xs font-mono uppercase text-muted-foreground/60 tracking-wider">{t('side.charts')}</h4>
-          <div className="rounded-xl overflow-hidden border border-border/20">
+          <div className="dashboard-neon-card rounded-xl overflow-hidden border border-cyan-400/15">
             <RealtimeChart data={latencyData} type="area" title={t('chart.latency')} color="primary" height={120} />
           </div>
-          <div className="rounded-xl overflow-hidden border border-border/20">
+          <div className="dashboard-neon-card rounded-xl overflow-hidden border border-cyan-400/15">
             <RealtimeChart data={projectsData} type="bar" title={t('chart.projects')} color="secondary" height={120} />
           </div>
         </div>

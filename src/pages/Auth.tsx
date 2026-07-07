@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,11 +8,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { ArrowLeft, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useGoogleOAuth } from '@/hooks/useGoogleOAuth';
+import { buildAppUrl, buildAuthRedirectUrl } from '@/lib/auth-redirect';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, isLoading: isAuthBootstrapping, signIn, signUp } = useAuth();
-  const { connectGoogle } = useGoogleOAuth();
+  const { connectGoogle, handleOAuthCallback } = useGoogleOAuth();
   const { toast } = useToast();
 
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -20,12 +22,46 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOAuthResolving, setIsOAuthResolving] = useState(false);
 
   useEffect(() => {
-    if (!isAuthBootstrapping && isAuthenticated) {
-      navigate('/', { replace: true });
+    const hasOAuthPayload = location.search.includes('code=') || location.hash.includes('access_token=');
+
+    if (!hasOAuthPayload) return;
+
+    let active = true;
+
+    const finalizeOAuth = async () => {
+      setIsOAuthResolving(true);
+      const ok = await handleOAuthCallback();
+
+      if (!active) return;
+
+      if (ok) {
+        window.location.replace(buildAppUrl('/dashboard'));
+        return;
+      }
+
+      setIsOAuthResolving(false);
+      toast({
+        title: 'No se pudo completar Google',
+        description: 'Google regreso bien, pero la sesion no termino de iniciarse.',
+        variant: 'destructive',
+      });
+    };
+
+    finalizeOAuth();
+
+    return () => {
+      active = false;
+    };
+  }, [handleOAuthCallback, location.hash, location.search, navigate, toast]);
+
+  useEffect(() => {
+    if (!isAuthBootstrapping && !isOAuthResolving && isAuthenticated) {
+      navigate('/dashboard', { replace: true });
     }
-  }, [isAuthBootstrapping, isAuthenticated, navigate]);
+  }, [isAuthBootstrapping, isOAuthResolving, isAuthenticated, navigate]);
 
   const handleGoogleLogin = async () => {
     await connectGoogle();
@@ -33,16 +69,19 @@ const Auth = () => {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      toast({ title: 'Ingresá tu email', description: 'Necesito tu email para enviarte el enlace.', variant: 'destructive' });
+      toast({ title: 'Ingresa tu email', description: 'Necesito tu email para enviarte el enlace.', variant: 'destructive' });
       return;
     }
+
     try {
       const { supabase } = await import('@/integrations/supabase/runtime-client');
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: buildAuthRedirectUrl('/reset-password'),
       });
+
       if (error) throw error;
-      toast({ title: 'Revisá tu email', description: 'Te enviamos un enlace para restablecer tu contraseña.' });
+
+      toast({ title: 'Revisa tu email', description: 'Te enviamos un enlace para restablecer tu contrasena.' });
     } catch (err: any) {
       toast({ title: 'Error', description: err.message || 'No se pudo enviar el email.', variant: 'destructive' });
     }
@@ -56,19 +95,19 @@ const Auth = () => {
     try {
       if (mode === 'login') {
         await signIn(email.trim(), password);
-        navigate('/', { replace: true });
+        navigate('/dashboard', { replace: true });
       } else {
         await signUp(email.trim(), password);
         toast({
           title: 'Cuenta creada',
-          description: 'Revisá tu email para confirmar tu cuenta.',
+          description: 'Revisa tu email para confirmar tu cuenta.',
         });
       }
     } catch (error: any) {
-      const msg = error.message || 'Error de autenticación';
+      const msg = error.message || 'Error de autenticacion';
       toast({
-        title: mode === 'login' ? 'Error al iniciar sesión' : 'Error al registrarse',
-        description: msg.includes('Invalid login') ? 'Email o contraseña incorrectos.' : msg,
+        title: mode === 'login' ? 'Error al iniciar sesion' : 'Error al registrarse',
+        description: msg.includes('Invalid login') ? 'Email o contrasena incorrectos.' : msg,
         variant: 'destructive',
       });
     } finally {
@@ -76,10 +115,15 @@ const Auth = () => {
     }
   };
 
-  if (isAuthBootstrapping) {
+  if (isAuthBootstrapping || isOAuthResolving) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            {isOAuthResolving ? 'Conectando tu cuenta de Google...' : 'Cargando acceso...'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -111,11 +155,10 @@ const Auth = () => {
               <span className="text-foreground/80">Labs</span>
             </h1>
             <p className="text-muted-foreground mt-2">
-              {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+              {mode === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}
             </p>
           </div>
 
-          {/* Google OAuth */}
           <Button
             onClick={handleGoogleLogin}
             className="w-full h-12 rounded-xl font-display font-semibold text-sm tracking-wide flex items-center justify-center gap-3 bg-foreground/90 hover:bg-foreground text-background transition-all duration-300"
@@ -128,15 +171,16 @@ const Auth = () => {
             </svg>
             Continuar con Google
           </Button>
+          <p className="mt-3 text-center text-xs text-muted-foreground/70">
+            Si tu cuenta fue creada con Google, vuelve a entrar con ese boton.
+          </p>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-border/30" />
             <span className="text-xs text-muted-foreground/60 font-mono">o</span>
             <div className="flex-1 h-px bg-border/30" />
           </div>
 
-          {/* Email/Password Form */}
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-muted-foreground text-xs flex items-center gap-1.5">
@@ -155,13 +199,13 @@ const Auth = () => {
 
             <div className="space-y-2">
               <Label htmlFor="password" className="text-muted-foreground text-xs flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5" /> Contraseña
+                <Lock className="w-3.5 h-3.5" /> Contrasena
               </Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
+                  placeholder="********"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -183,31 +227,33 @@ const Auth = () => {
               disabled={isSubmitting}
               className="w-full h-11 rounded-xl font-display font-semibold text-sm bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {mode === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}
             </Button>
 
             {mode === 'login' && (
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="w-full text-center text-xs text-muted-foreground/70 hover:text-primary transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="w-full text-center text-xs text-muted-foreground/70 hover:text-primary transition-colors"
+                >
+                  Olvidaste tu contrasena?
+                </button>
+                <p className="text-center text-[11px] text-muted-foreground/55">
+                  Si te registraste con Google, no hace falta resetear clave: usa "Continuar con Google".
+                </p>
+              </div>
             )}
           </form>
 
-          {/* Toggle mode */}
           <p className="text-center text-xs text-muted-foreground/60 mt-5">
-            {mode === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
+            {mode === 'login' ? 'No tenes cuenta?' : 'Ya tenes cuenta?'}{' '}
             <button
               onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
               className="text-primary hover:underline font-medium"
             >
-              {mode === 'login' ? 'Registrate' : 'Iniciá sesión'}
+              {mode === 'login' ? 'Registrate' : 'Inicia sesion'}
             </button>
           </p>
         </div>

@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMapsBackground } from '@/components/GoogleMapsBackground';
 import { CustomBackground } from './CustomBackground';
@@ -14,6 +15,7 @@ import { FocusMissionMode } from './FocusMissionMode';
 import { HistoryModal } from './HistoryModal';
 import { ExitModal } from './ExitModal';
 import { ProjectManagerModal } from './ProjectManagerModal';
+import { DashboardNeonAtmosphere } from './DashboardNeonAtmosphere';
 
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +29,7 @@ export const ProjectDashboard = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isExitOpen, setIsExitOpen] = useState(false);
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
+  const [dashboardScale, setDashboardScale] = useState(1);
   const { toast } = useToast();
   const { signOut } = useAuth();
   const { t } = useLanguage();
@@ -55,10 +58,36 @@ export const ProjectDashboard = () => {
 
   const handleOpenIntegrations = useCallback(() => setIsIntegrationsOpen(true), []);
 
+  const handleFocusConsole = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('eq:focus-console'));
+  }, []);
+
+  useEffect(() => {
+    const openIntegrations = () => setIsIntegrationsOpen(true);
+    window.addEventListener('eq:open-integration-center', openIntegrations);
+    return () => window.removeEventListener('eq:open-integration-center', openIntegrations);
+  }, []);
+
+  useEffect(() => {
+    const zoomIn = () => setDashboardScale(value => Math.min(1.35, Number((value + 0.08).toFixed(2))));
+    const zoomOut = () => setDashboardScale(value => Math.max(0.88, Number((value - 0.08).toFixed(2))));
+
+    window.addEventListener('eq:response-zoom-in', zoomIn);
+    window.addEventListener('eq:response-zoom-out', zoomOut);
+    return () => {
+      window.removeEventListener('eq:response-zoom-in', zoomIn);
+      window.removeEventListener('eq:response-zoom-out', zoomOut);
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen w-full overflow-hidden relative">
+    <div
+      className="min-h-screen w-full overflow-hidden relative"
+      style={{ '--dashboard-content-scale': dashboardScale } as CSSProperties}
+    >
       <GoogleMapsBackground />
       <CustomBackground />
+      <DashboardNeonAtmosphere />
 
       <motion.div
         animate={{ 
@@ -74,6 +103,7 @@ export const ProjectDashboard = () => {
           onHistory={handleHistory}
           onExit={handleExit}
           onOpenIntegrations={handleOpenIntegrations}
+          onFocusConsole={handleFocusConsole}
         />
       </motion.div>
 
