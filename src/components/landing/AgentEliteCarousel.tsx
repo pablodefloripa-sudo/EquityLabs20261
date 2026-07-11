@@ -27,6 +27,8 @@ import { useNavigate } from 'react-router-dom';
 import { GhostTyper } from './GhostTyper';
 import type { LandingLang } from './LanguageFloater';
 import data from '@/data/lifestyleAgents.json';
+import { resolveLandingLang } from './landingContent';
+import { getLandingPlanCopy } from './siteCopy';
 
 const agentIcons = [
   Lightbulb,
@@ -52,61 +54,59 @@ const agentIcons = [
 ];
 
 const badgeColors: Record<string, string> = {
-  CAREER: 'from-blue-500/20 to-blue-600/20 text-blue-400 border-blue-500/30',
-  ENTREPRENEURSHIP: 'from-amber-500/20 to-orange-600/20 text-amber-400 border-amber-500/30',
-  BUSINESS: 'from-emerald-500/20 to-green-600/20 text-emerald-400 border-emerald-500/30',
-  LIFESTYLE: 'from-purple-500/20 to-violet-600/20 text-purple-400 border-purple-500/30',
-  WELLNESS: 'from-rose-500/20 to-pink-600/20 text-rose-400 border-rose-500/30',
+  CAREER: 'from-cyan-400/20 to-cyan-500/10 text-cyan-200 border-cyan-300/35',
+  ENTREPRENEURSHIP: 'from-yellow-400/20 to-yellow-500/10 text-yellow-200 border-yellow-300/35',
+  BUSINESS: 'from-emerald-400/20 to-emerald-500/10 text-emerald-200 border-emerald-300/35',
+  LIFESTYLE: 'from-red-400/20 to-red-500/10 text-red-200 border-red-300/35',
+  WELLNESS: 'from-red-400/20 to-yellow-400/10 text-red-200 border-red-300/35',
 };
 
-type PlanCopy = {
-  freeLabel: string;
-  paidLabel: string;
-  freeCta: string;
-  upgradeCta: string;
-  freeHighlights: Array<{ title: string; detail: string }>;
-  paidHighlights: string[];
-};
-
-const planCopyByLang: Partial<Record<LandingLang, PlanCopy>> = {
-  en: {
-    freeLabel: 'SOVEREIGN TRIAL',
-    paidLabel: '2026 UPGRADE PATH',
-    freeCta: 'Explore free trial',
-    upgradeCta: 'View 2026 plans',
-    freeHighlights: [
-      { title: 'Multi-agent access', detail: 'Several agents work on one objective.' },
-      { title: 'Strategic north', detail: 'We define the real direction before scaling.' },
-      { title: 'Final roadmap', detail: 'You leave with a next-step plan, not just prompts.' },
-    ],
-    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+const accentCards = [
+  {
+    border: 'border-emerald-300/25',
+    bg: 'bg-emerald-300/10',
+    title: 'text-emerald-200',
+    body: 'text-emerald-50/68',
   },
-  es: {
-    freeLabel: 'SOVEREIGN TRIAL',
-    paidLabel: 'RUTA 2026',
-    freeCta: 'Explorar trial gratis',
-    upgradeCta: 'Ver planes 2026',
-    freeHighlights: [
-      { title: 'Multiples agentes', detail: 'Varios agentes empujan el mismo objetivo.' },
-      { title: 'Norte estrategico', detail: 'Definimos direccion real antes de escalar.' },
-      { title: 'Reporte final', detail: 'Te llevas siguiente paso y recomendaciones claras.' },
-    ],
-    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+  {
+    border: 'border-yellow-300/25',
+    bg: 'bg-yellow-300/10',
+    title: 'text-yellow-200',
+    body: 'text-yellow-50/68',
   },
-};
+  {
+    border: 'border-red-300/25',
+    bg: 'bg-red-300/10',
+    title: 'text-red-200',
+    body: 'text-red-50/68',
+  },
+];
 
 interface Props {
   lang: LandingLang;
 }
 
+type Agent = {
+  id: string | number;
+  numId?: string | number;
+  badge: string;
+  name: Record<string, string>;
+  mission: Record<string, string>;
+  freeModels?: string[];
+  proModels?: string[];
+  freeTasks?: Record<string, string[]>;
+  proTasks?: Record<string, string[]>;
+};
+
 export const AgentEliteCarousel = ({ lang }: Props) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const navigate = useNavigate();
-  const agents = data.agents;
-  const phrases = (data.heroPhrase as Record<string, string[]>)[lang] || data.heroPhrase.en;
-  const ui = (data.ui as Record<string, Record<string, string>>)[lang] || data.ui.en;
-  const planCopy = planCopyByLang[lang] || planCopyByLang.en!;
+  const agents = data.agents as Agent[];
+  const activeLang = resolveLandingLang(lang);
+  const phrases = (data.heroPhrase as Record<string, string[]>)[activeLang] || data.heroPhrase.en;
+  const ui = (data.ui as Record<string, Record<string, string>>)[activeLang] || data.ui.en;
+  const planCopy = getLandingPlanCopy(activeLang);
   const autoRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const resetAuto = useCallback(() => {
@@ -148,30 +148,30 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
   const visible = getVisible();
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden relative">
-      <div className="relative z-20 flex min-h-[190px] h-[24vh] items-center justify-center">
-        <GhostTyper text={phrases[activeIndex % phrases.length]} isActive key={`${activeIndex}-${lang}`} />
+    <div className="flex h-screen w-full flex-col overflow-hidden relative pb-[38px]">
+      <div className="relative z-20 flex min-h-[164px] h-[23vh] items-center justify-center">
+        <GhostTyper text={phrases[activeIndex % phrases.length]} isActive key={`${activeIndex}-${activeLang}`} />
       </div>
 
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4">
-        <div className="relative flex h-[640px] w-full max-w-7xl items-center justify-center">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-4">
+        <div className="relative flex h-full min-h-[500px] w-full max-w-7xl items-center justify-center">
           <AnimatePresence mode="popLayout">
             {visible.map((idx, pos) => {
-              const agent = agents[idx] as any;
+              const agent = agents[idx];
               const Icon = agentIcons[idx % agentIcons.length];
               const offset = pos - 2;
               const isCenter = offset === 0;
               const isHovered = hoveredIdx === idx;
-              const name = (agent.name as Record<string, string>)[lang] || agent.name.en;
-              const mission = (agent.mission as Record<string, string>)[lang] || agent.mission.en;
+              const name = (agent.name as Record<string, string>)[activeLang] || agent.name.en;
+              const mission = (agent.mission as Record<string, string>)[activeLang] || agent.mission.en;
               const badge = badgeColors[agent.badge] || badgeColors.LIFESTYLE;
               const freeModels: string[] = agent.freeModels || [];
               const proModels: string[] = agent.proModels || [];
               const freeTasksMap = (agent.freeTasks || {}) as Record<string, string[]>;
               const proTasksMap = (agent.proTasks || {}) as Record<string, string[]>;
-              const freeTasks: string[] = freeTasksMap[lang] || freeTasksMap.en || [];
-              const proTasks: string[] = proTasksMap[lang] || proTasksMap.en || [];
-              const baseScale = isCenter ? 1 : 0.62 - Math.abs(offset) * 0.05;
+              const freeTasks: string[] = freeTasksMap[activeLang] || freeTasksMap.en || [];
+              const proTasks: string[] = proTasksMap[activeLang] || proTasksMap.en || [];
+              const baseScale = isCenter ? 1 : 0.56 - Math.abs(offset) * 0.04;
               const finalScale = isHovered ? baseScale * 1.06 : baseScale;
 
               return (
@@ -181,7 +181,7 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                   animate={{
                     opacity: isCenter || isHovered ? 1 : 0.35 + 0.12 * (2 - Math.abs(offset)),
                     scale: finalScale,
-                    x: offset * (isCenter ? 0 : 380),
+                    x: offset * (isCenter ? 0 : 480),
                     zIndex: isHovered ? 40 : isCenter ? 30 : 20 - Math.abs(offset),
                     rotateY: offset * -5,
                   }}
@@ -194,33 +194,33 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                 >
                   <div
                     className={[
-                      'w-[min(92vw,472px)] md:w-[548px] overflow-hidden rounded-[22px] border-2 backdrop-blur-xl transition-all duration-500',
+                      'w-[min(92vw,472px)] md:w-[min(86vw,880px)] overflow-hidden rounded-lg border backdrop-blur-xl transition-all duration-500',
                       isCenter
-                        ? 'bg-black/72 border-cyan-400/60'
+                        ? 'bg-black/50 border-cyan-400/30'
                         : isHovered
-                          ? 'bg-black/60 border-fuchsia-400/70'
+                          ? 'bg-black/50 border-yellow-300/45'
                           : 'bg-black/30 border-white/5',
                     ].join(' ')}
                     style={
                       isCenter
-                        ? { boxShadow: '0 0 60px rgba(34,211,238,0.3), inset 0 0 30px rgba(34,211,238,0.05)' }
+                        ? { boxShadow: '0 0 25px rgba(34,211,238,0.15)' }
                         : isHovered
-                          ? { boxShadow: '0 0 40px rgba(232,121,249,0.35)' }
+                          ? { boxShadow: '0 0 34px rgba(250,204,21,0.22)' }
                           : undefined
                     }
                   >
-                    <div className="p-7 pb-4">
-                      <div className="mb-4 flex items-center gap-3">
+                    <div className="p-5 pb-4 sm:p-6 sm:pb-4">
+                      <div className="mb-4 flex items-center gap-3 border-b border-cyan-300/10 pb-4">
                         <div
                           className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${
-                            isCenter ? 'bg-cyan-400/15 text-cyan-300 border border-cyan-400/40' : 'bg-white/5 text-muted-foreground'
+                            isCenter ? 'bg-cyan-400/15 text-cyan-200 border border-cyan-300/35' : 'bg-white/5 text-muted-foreground'
                           }`}
                         >
                           <Icon className="h-7 w-7" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className={`font-mono text-[10px] ${isCenter ? 'text-cyan-400/80' : 'text-[#b49664]/70'}`}>
+                            <span className={`font-mono text-[10px] ${isCenter ? 'text-cyan-300/80' : 'text-yellow-200/70'}`}>
                               #{String(agent.numId || idx + 1).padStart(2, '0')}
                             </span>
                             <h3 className={`truncate font-display text-[15px] md:text-base font-bold ${isCenter ? 'text-white' : 'text-muted-foreground'}`}>
@@ -233,74 +233,84 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                         </div>
                       </div>
 
-                      <p className={`mb-4 line-clamp-2 text-[12px] leading-relaxed ${isCenter ? 'text-white/78' : 'text-muted-foreground/50'}`}>
+                      <p className={`mb-4 line-clamp-2 text-[12px] leading-relaxed ${isCenter ? 'text-cyan-50/78' : 'text-muted-foreground/50'}`}>
                         {mission}
                       </p>
 
                       {isCenter ? (
-                        <div className="space-y-3">
-                          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3">
+                        <div className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr]">
+                          <div className="rounded-lg border border-emerald-300/25 bg-emerald-300/10 p-3">
                             <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold tracking-wider text-emerald-400">
+                              <span className="rounded bg-emerald-300/18 px-2 py-0.5 text-[10px] font-bold tracking-wider text-emerald-200">
                                 FREE (30 Dias Trial)
                               </span>
-                              <span className="rounded-full border border-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-100/85">
+                              <span className="rounded-full border border-cyan-300/18 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-cyan-100/85">
                                 {planCopy.freeLabel}
                               </span>
-                              <span className="truncate font-mono text-[10px] text-emerald-400/70">{freeModels.join(' - ')}</span>
+                              <span className="truncate font-mono text-[10px] text-emerald-100/70">{freeModels.join(' - ')}</span>
                             </div>
 
                             <ul className="space-y-1">
                               {freeTasks.map((task, index) => (
-                                <li key={index} className="flex gap-1.5 text-[11px] leading-snug text-white/72">
-                                  <span className="shrink-0 text-emerald-400/60">{'>'}</span>
+                                <li key={index} className="flex gap-1.5 text-[11px] leading-snug text-emerald-50/74">
+                                  <span className="shrink-0 text-cyan-200/70">{'>'}</span>
                                   <span className="line-clamp-1">{task}</span>
                                 </li>
                               ))}
                             </ul>
 
-                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                              {planCopy.freeHighlights.map((item) => (
+                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                              {planCopy.freeHighlights.map((item, index) => {
+                                const accent = accentCards[index % accentCards.length];
+                                return (
                                 <div
                                   key={item.title}
-                                  className="rounded-lg border border-emerald-500/20 bg-black/20 px-2.5 py-2"
+                                  className={`rounded-lg border px-2.5 py-2 ${accent.border} ${accent.bg}`}
                                 >
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${accent.title}`}>
                                     {item.title}
                                   </p>
-                                  <p className="mt-1 text-[10px] leading-snug text-white/58">
+                                  <p className={`mt-1 text-[10px] leading-snug ${accent.body}`}>
                                     {item.detail}
                                   </p>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
 
-                          <div className="rounded-xl border border-cyan-400/30 bg-cyan-400/5 p-3">
+                          <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-3">
                             <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <span className="rounded bg-cyan-400/20 px-2 py-0.5 text-[10px] font-bold tracking-wider text-cyan-300">
+                              <span className="rounded bg-cyan-300/18 px-2 py-0.5 text-[10px] font-bold tracking-wider text-cyan-200">
                                 {planCopy.paidLabel}
                               </span>
-                              <span className="truncate font-mono text-[10px] text-cyan-300/80">
+                              <span className="truncate font-mono text-[10px] text-cyan-100/80">
                                 {proModels.slice(0, 4).join(' - ')}
                                 {proModels.length > 4 ? ' ...' : ''}
                               </span>
                             </div>
 
-                            <ul className="space-y-1">
+                            <ul className="grid gap-1 sm:grid-cols-2">
                               {proTasks.map((task, index) => (
-                                <li key={index} className="flex gap-1.5 text-[11px] leading-snug text-cyan-100/88">
-                                  <span className="shrink-0 text-cyan-300">*</span>
+                                <li key={index} className="flex gap-1.5 text-[11px] leading-snug text-cyan-50/82">
+                                  <span className={index % 4 === 0 ? 'shrink-0 text-cyan-200' : index % 4 === 1 ? 'shrink-0 text-emerald-200' : index % 4 === 2 ? 'shrink-0 text-yellow-200' : 'shrink-0 text-red-200'}>*</span>
                                   <span className="line-clamp-1">{task}</span>
                                 </li>
                               ))}
                             </ul>
 
                             <div className="mt-3 flex flex-wrap gap-1.5">
-                              {planCopy.paidHighlights.map((item) => (
+                              {planCopy.paidHighlights.map((item, index) => (
                                 <span
                                   key={item}
-                                  className="rounded-md border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-[10px] font-semibold tracking-wide text-cyan-100/90"
+                                  className={[
+                                    'rounded-md border px-2 py-1 text-[10px] font-semibold tracking-wide',
+                                    index === 0
+                                      ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100/90'
+                                      : index === 1
+                                        ? 'border-yellow-300/25 bg-yellow-300/10 text-yellow-100/90'
+                                        : 'border-red-300/25 bg-red-300/10 text-red-100/90',
+                                  ].join(' ')}
                                 >
                                   {item}
                                 </span>
@@ -326,17 +336,17 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col gap-2 px-7 pb-6 sm:flex-row"
+                        className="flex flex-col gap-2 px-5 pb-5 sm:flex-row sm:px-6"
                       >
                         <button
                           onClick={handleFree}
-                          className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-400 transition-all hover:bg-emerald-500/25"
+                          className="flex-1 rounded-lg border border-emerald-300/40 bg-emerald-300/15 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200 transition-all hover:bg-emerald-300/25"
                         >
                           {planCopy.freeCta}
                         </button>
                         <button
                           onClick={handleUpgrade}
-                          className="flex-1 rounded-lg border border-cyan-400/70 bg-black py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-300 transition-all hover:border-cyan-300 hover:text-cyan-200"
+                          className="flex-1 rounded-lg border border-cyan-300/70 bg-black/45 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200 transition-all hover:border-yellow-200/70 hover:text-yellow-100"
                           style={{ boxShadow: '0 0 18px rgba(34,211,238,0.4), inset 0 0 12px rgba(34,211,238,0.08)' }}
                         >
                           <span className="flex items-center justify-center gap-1">{planCopy.upgradeCta}</span>

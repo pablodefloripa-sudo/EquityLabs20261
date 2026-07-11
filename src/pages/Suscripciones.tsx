@@ -6,18 +6,27 @@ import {
   ArrowRight,
   BrainCircuit,
   Building2,
+  Calendar,
+  CheckCircle2,
   Crown,
+  DollarSign,
+  FileSpreadsheet,
   Gem,
-  Network,
+  Globe,
+  HardDrive,
+  Mail,
   Rocket,
   ShieldCheck,
   Sparkles,
   Target,
+  Users,
   Zap,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/runtime-client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { getSubscriptionPageCopy } from '@/components/landing/siteCopy';
+import { getLandingLang } from '@/components/landing/landingContent';
 
 type SubscriptionPlanKey =
   | 'FREE_30_DAYS'
@@ -31,168 +40,184 @@ type PlanDefinition = {
   key: SubscriptionPlanKey;
   tier: string;
   displayPlan: string;
-  agents: string;
-  models: string[];
-  exclusiveModels?: string[];
+  name: string;
   price: string;
   cadence: string;
-  name: string;
-  idealFor: string;
-  juicy: string;
+  agentLimit: string;
+  modelRouting: string;
   summary: string;
-  buttonLabel: string;
-  checkoutUrl?: string;
   badge: string;
   accent: string;
   icon: LucideIcon;
+  checkoutUrl?: string;
   spotlight?: boolean;
   features: string[];
+  productFit: string[];
+};
+
+type UserPlanPayload = {
+  user_id: string;
+  plan: SubscriptionPlanKey;
+  status: 'active' | 'requested';
+  start_date: string;
+  end_date: string | null;
 };
 
 const plans: PlanDefinition[] = [
   {
     key: 'FREE_30_DAYS',
     tier: 'FREE',
-    displayPlan: 'FREE',
-    agents: '3',
-    models: ['DeepSeek R1', 'Gemini-2.5-Flash-Lite', 'Llama-3.3-70B', 'Qwen2.5-7B', 'GPT-4o-Mini'],
+    displayPlan: 'FREE 30 DAYS',
+    name: 'Trial operativo',
     price: '$0',
     cadence: '30 dias',
-    name: 'Sovereign Trial',
-    idealFor: 'Quienes quieren probar el poder real',
-    juicy: '3 agentes con modelos gratuitos y costo operativo controlado.',
-    summary: 'Entrada gratuita para probar conectividad IA real sin tocar rutas comerciales de API.',
-    buttonLabel: 'Activar 30 dias',
-    badge: 'Launch Point',
+    agentLimit: '3',
+    modelRouting: 'Routing base con modelos gratuitos y control de costo.',
+    summary: 'Ideal para probar el dashboard, los agentes y el chat sin tocar la capa comercial.',
+    badge: 'Start here',
     accent: 'from-emerald-400 via-teal-400 to-cyan-400',
     icon: Zap,
     features: [
       '3 agentes activos',
-      'DeepSeek R1, Gemini Flash Lite, Llama 70B, Qwen 7B y GPT-4o Mini',
-      'Control de costo obligatorio para mantener consumo en cero',
-      'Limite gratuito con respuesta limpia si se excede',
+      'Chat con routing gratuito',
+      'Dashboard con contexto y proyectos',
+      'Límite diario gratuito controlado desde backend',
+    ],
+    productFit: [
+      'Validación de uso real',
+      'Onboarding de usuarios nuevos',
+      'Prueba de integración con el dashboard',
     ],
   },
   {
     key: 'TACTICAL_25',
     tier: 'TACTICAL',
-    displayPlan: 'Tactical $25',
-    agents: '5',
-    models: ['Gemini-2.5-Flash', 'Claude-3.5-Haiku', 'Mistral-Large', 'Grok-2', 'DeepSeek-V3', 'NVIDIA Nemotron-4'],
+    displayPlan: 'TACTICAL $25',
+    name: 'Ejecución diaria',
     price: '$25',
     cadence: '/mes',
-    name: 'Tactical Operator',
-    idealFor: 'Emprendedores jovenes y freelancers',
-    juicy: '5 agentes con modelos tacticos para ejecucion diaria.',
-    summary: 'Conectividad seria para operar rapido, con modelos eficientes y control de presupuesto.',
-    buttonLabel: 'Pagar Tactical en Stripe',
-    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_TACTICAL,
-    badge: 'Efficient',
+    agentLimit: '5',
+    modelRouting: 'Routing táctico para agentes de operación.',
+    summary: 'Para equipos chicos que quieren más capacidad de ejecución sin complejidad enterprise.',
+    badge: 'Most efficient',
     accent: 'from-cyan-400 via-sky-400 to-blue-500',
     icon: Target,
+    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_TACTICAL,
     features: [
       '5 agentes activos',
-      'Gemini Flash, Claude Haiku, Mistral Large, Grok-2 y DeepSeek-V3',
-      'NVIDIA Nemotron-4 para tareas especializadas',
-      'Conectividad mensual de baja friccion',
+      'Mejor routing en el chat y en la mesa de trabajo',
+      'Ideal para tareas repetibles y seguimiento',
+      'Primer upgrade natural desde el trial',
+    ],
+    productFit: [
+      'Freelancers y founders',
+      'Operaciones semanales',
+      'Uso continuo con bajo costo',
     ],
   },
   {
     key: 'PREMIUM_50',
     tier: 'PREMIUM',
-    displayPlan: 'Premium $50',
-    agents: '6',
-    models: ['Claude-3.5-Sonnet', 'Gemini-2.5-Pro', 'GPT-4o', 'Qwen2.5-72B', 'Command-R+', 'Snowflake Arctic'],
+    displayPlan: 'PREMIUM $50',
+    name: 'Capa principal',
     price: '$50',
     cadence: '/mes',
-    name: 'Cognitive Premium',
-    idealFor: 'Profesionales y emprendedores serios',
-    juicy: '6 agentes y modelos premium para trabajo profundo.',
-    summary: 'El punto dulce de conectividad: potencia, precision y variedad sin subir a operacion enterprise.',
-    buttonLabel: 'Pagar Premium en Stripe',
-    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_PREMIUM,
-    badge: 'Most Chosen',
+    agentLimit: '6',
+    modelRouting: 'Routing premium para trabajo más profundo y mejor calidad.',
+    summary: 'El plan más equilibrado para usar EquityLabs como copiloto serio de trabajo diario.',
+    badge: 'Best balance',
     accent: 'from-fuchsia-400 via-violet-400 to-cyan-400',
     icon: BrainCircuit,
     spotlight: true,
+    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_PREMIUM,
     features: [
       '6 agentes activos',
-      'Claude Sonnet, Gemini Pro y GPT-4o',
-      'Qwen 72B, Command-R+ y Snowflake Arctic',
-      'Balance fuerte entre costo, profundidad y velocidad',
+      'Acceso a modelos premium en el backend',
+      'Mejor desempeño para análisis, escritura y revisión',
+      'Encaja con el dashboard operativo actual',
+    ],
+    productFit: [
+      'Operación profesional',
+      'Uso frecuente del chat',
+      'Trabajo con integraciones Google',
     ],
   },
   {
     key: 'MASTERMIND_100',
     tier: 'MASTERMIND',
-    displayPlan: 'Mastermind $100',
-    agents: '8',
-    models: ['Claude-4-Sonnet', 'o1-mini', 'Grok-3', 'Llama-4-405B', 'NVIDIA Llama-3.1-Nemotron', 'DBRX', 'Phi-4'],
+    displayPlan: 'MASTERMIND $100',
+    name: 'Razonamiento avanzado',
     price: '$100',
     cadence: '/mes',
-    name: 'Mastermind Sovereign',
-    idealFor: 'Alto rendimiento y vision',
-    juicy: '8 agentes con modelos de razonamiento avanzado.',
-    summary: 'Capa de alto rendimiento para vision, estrategia y ejecucion con modelos de frontera.',
-    buttonLabel: 'Pagar Mastermind en Stripe',
-    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_MASTERMIND,
-    badge: 'Elite',
+    agentLimit: '8',
+    modelRouting: 'Routing avanzado para decisiones de alto impacto.',
+    summary: 'Pensado para cuando el producto deja de ser copiloto y pasa a ser sistema de decisión.',
+    badge: 'Advanced',
     accent: 'from-amber-300 via-orange-400 to-rose-400',
     icon: Crown,
+    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_MASTERMIND,
     features: [
       '8 agentes activos',
-      'Claude 4 Sonnet, o1-mini, Grok-3 y Llama-4-405B',
-      'Nemotron, DBRX y Phi-4 para arquitectura y revision',
-      'Pensado para decisiones exigentes y trabajo de alto nivel',
+      'Mejor cobertura de reasoning y revisión',
+      'Más holgura para flujos complejos',
+      'Preparado para trabajo estratégico',
+    ],
+    productFit: [
+      'Equipos de alta exigencia',
+      'Rutas con más iteración',
+      'Análisis y dirección estratégica',
     ],
   },
   {
     key: 'ENTERPRISE_500',
     tier: 'ENTERPRISE',
-    displayPlan: 'Enterprise $500',
-    agents: '8',
-    models: ['Claude-4-Opus', 'o1', 'Gemini-2.5-Pro-Preview', 'GPT-4.5-Preview', 'Perplexity-Sonar', 'NVIDIA Nemotron-70B'],
+    displayPlan: 'ENTERPRISE $500',
+    name: 'Escala operativa',
     price: '$500',
     cadence: '/mes',
-    name: 'Autonomous Enterprise',
-    idealFor: 'Empresas y operaciones grandes',
-    juicy: '8 agentes enterprise para operaciones grandes.',
-    summary: 'Conectividad de escala para procesos, equipos y automatizacion con modelos de mayor capacidad.',
-    buttonLabel: 'Pagar Enterprise en Stripe',
-    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_ENTERPRISE,
-    badge: 'Ops Scale',
+    agentLimit: '8',
+    modelRouting: 'Routing enterprise para operaciones amplias.',
+    summary: 'Para equipos que quieren mover procesos, no solo conversaciones.',
+    badge: 'Scale',
     accent: 'from-slate-200 via-cyan-300 to-sky-500',
     icon: Building2,
+    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_ENTERPRISE,
     features: [
       '8 agentes activos',
-      'Claude Opus, o1, Gemini Pro Preview y GPT-4.5 Preview',
-      'Perplexity Sonar y NVIDIA Nemotron-70B',
-      'Preparado para operaciones grandes y automatizacion avanzada',
+      'Capa enterprise para flujos más pesados',
+      'Pensado para equipos y automatización avanzada',
+      'Ajustado al backend de routing existente',
+    ],
+    productFit: [
+      'Operaciones grandes',
+      'Múltiples usuarios',
+      'Automatización y soporte interno',
     ],
   },
   {
     key: 'ALLIANCE_1000',
     tier: 'ALLIANCE',
-    displayPlan: 'Alliance $1000',
-    agents: '8+',
-    models: ['Todos los anteriores'],
-    exclusiveModels: ['Recursal-32B', 'MythoMax', 'Dolphin-2.9', 'Command-R+ extended', 'NVIDIA Cosmos experimental'],
+    displayPlan: 'ALLIANCE $1000',
+    name: 'Partner tier',
     price: '$1000',
     cadence: '/mes',
-    name: 'Global Alliance',
-    idealFor: 'Socios estrategicos y expansion regional',
-    juicy: '8+ agentes y acceso a modelos raros/exclusivos.',
-    summary: 'La capa partner: todos los modelos anteriores mas conectividad experimental para expansion.',
-    buttonLabel: 'Pagar Alliance en Stripe',
-    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_ALLIANCE,
-    badge: 'Partner Tier',
+    agentLimit: '8+',
+    modelRouting: 'Routing partner con modelos exclusivos.',
+    summary: 'La capa más alta para clientes estratégicos y despliegues especiales.',
+    badge: 'Partner',
     accent: 'from-emerald-300 via-lime-300 to-cyan-300',
-    icon: Network,
+    icon: Globe,
+    checkoutUrl: import.meta.env.VITE_STRIPE_CHECKOUT_ALLIANCE,
     features: [
       '8+ agentes activos',
-      'Todos los modelos anteriores',
-      'Recursal-32B, MythoMax, Dolphin-2.9 y Command-R+ extended',
-      'NVIDIA Cosmos experimental para exploracion avanzada',
+      'Acceso a modelos exclusivos en backend',
+      'Pensado para acuerdos estratégicos',
+      'Nivel máximo de personalización comercial',
+    ],
+    productFit: [
+      'Partnerships',
+      'Clientes estratégicos',
+      'Expansión con soporte premium',
     ],
   },
 ];
@@ -206,12 +231,37 @@ const accentGlow: Record<SubscriptionPlanKey, string> = {
   ALLIANCE_1000: 'shadow-[0_0_45px_rgba(132,204,22,0.18)]',
 };
 
+const persistSubscriptionContext = (plan: PlanDefinition) => {
+  localStorage.setItem(
+    'eq_subscription_context',
+    JSON.stringify({
+      key: plan.key,
+      tier: plan.tier,
+      displayPlan: plan.displayPlan,
+      agentLimit: plan.agentLimit,
+      modelRouting: plan.modelRouting,
+      selectedAt: new Date().toISOString(),
+    }),
+  );
+};
+
+const featureIcons = {
+  agents: Users,
+  models: Sparkles,
+  google: Mail,
+  workspace: HardDrive,
+  calendar: Calendar,
+  sheets: FileSpreadsheet,
+};
+
 const Suscripciones = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
   const [submittedPlan, setSubmittedPlan] = useState<string | null>(null);
+  const siteLang = getLandingLang();
+  const copy = getSubscriptionPageCopy(siteLang);
 
   const spotlightPlan = useMemo(() => location.hash.replace('#', ''), [location.hash]);
 
@@ -228,6 +278,7 @@ const Suscripciones = () => {
   const handleSelectPlan = async (plan: PlanDefinition) => {
     try {
       setLoading(plan.key);
+      persistSubscriptionContext(plan);
 
       if (!isAuthenticated || !user) {
         navigate('/auth');
@@ -241,18 +292,17 @@ const Suscripciones = () => {
         endDate.setDate(endDate.getDate() + 30);
       }
 
+      const planPayload: UserPlanPayload = {
+        user_id: user.id,
+        plan: plan.key,
+        status: plan.key === 'FREE_30_DAYS' ? 'active' : 'requested',
+        start_date: startDate.toISOString(),
+        end_date: plan.key === 'FREE_30_DAYS' ? endDate.toISOString() : null,
+      };
+
       const { error } = await supabase
-        .from('user_planes' as any)
-        .upsert(
-          {
-            user_id: user.id,
-            plan: plan.key,
-            status: plan.key === 'FREE_30_DAYS' ? 'active' : 'requested',
-            start_date: startDate.toISOString(),
-            end_date: plan.key === 'FREE_30_DAYS' ? endDate.toISOString() : null,
-          } as any,
-          { onConflict: 'user_id' },
-        );
+        .from('user_planes' as never)
+        .upsert(planPayload as never, { onConflict: 'user_id' });
 
       if (error) {
         console.error('Error al guardar el plan:', error);
@@ -263,7 +313,7 @@ const Suscripciones = () => {
       setSubmittedPlan(plan.key);
 
       if (plan.key === 'FREE_30_DAYS') {
-        toast.success('Sovereign Trial activado por 30 dias.');
+        toast.success('Trial operativo activado por 30 dias.');
         navigate('/');
         return;
       }
@@ -286,12 +336,7 @@ const Suscripciones = () => {
   return (
     <div className="relative min-h-screen overflow-hidden bg-black text-white">
       <div className="fixed inset-0">
-        <img
-          src="/slides/base.jpg"
-          alt=""
-          aria-hidden
-          className="h-full w-full object-cover opacity-40"
-        />
+        <img src="/slides/base.jpg" alt="" aria-hidden className="h-full w-full object-cover opacity-35" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_30%),radial-gradient(circle_at_top_right,rgba(217,70,239,0.12),transparent_28%),linear-gradient(180deg,rgba(2,6,23,0.82),rgba(2,6,23,0.96))]" />
         <div className="subscription-float subscription-float-a" />
         <div className="subscription-float subscription-float-b" />
@@ -309,125 +354,83 @@ const Suscripciones = () => {
               Volver al landing
             </button>
 
-            <div className="flex items-center gap-3">
-              <div className="hidden rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs text-white/70 md:block">
-                {isAuthenticated ? 'Sesion iniciada: listo para activar' : 'Inicia sesion para activar cualquier plan'}
-              </div>
-              <button
-                onClick={() => navigate(isAuthenticated ? '/' : '/auth')}
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
-              >
-                {isAuthenticated ? 'Abrir dashboard' : 'Iniciar sesion'}
-                <ArrowRight className="h-4 w-4" />
-              </button>
+            <button
+              onClick={() => navigate(isAuthenticated ? '/' : '/auth')}
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+            >
+              {isAuthenticated ? 'Abrir dashboard' : 'Iniciar sesion'}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-6 pb-12 pt-12">
+          <div className="max-w-4xl">
+            <div className="mb-5 flex flex-wrap gap-2 text-xs uppercase tracking-[0.22em] text-cyan-300/80">
+              <span className="subscription-shimmer-border rounded-full bg-fuchsia-400/8 px-3 py-1 text-cyan-200">{copy.heroBadge}</span>
+            </div>
+
+            <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-cyan-200 text-glow-sm md:text-6xl">
+              {copy.heroTitle}
+            </h1>
+
+            <p className="mt-5 max-w-3xl text-base leading-7 text-white/72 md:text-lg">
+              {copy.heroDescription}
+            </p>
+          </div>
+
+            <div className="mt-10 grid gap-4 md:grid-cols-4">
+            <div className="subscription-mini-panel pb-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">{copy.sectionAgents}</p>
+              <p className="mt-2 text-2xl font-semibold text-cyan-200">{copy.statAgents}</p>
+              <p className="mt-1 text-sm text-white/70">{copy.statAgentsDetail}</p>
+            </div>
+            <div className="subscription-mini-panel pb-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">{copy.sectionRouting}</p>
+              <p className="mt-2 text-2xl font-semibold text-cyan-200">{copy.statModels}</p>
+              <p className="mt-1 text-sm text-white/70">{copy.statModelsDetail}</p>
+            </div>
+            <div className="subscription-mini-panel pb-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">{copy.sectionWorkspace}</p>
+              <p className="mt-2 text-2xl font-semibold text-cyan-200">{copy.statWorkspace}</p>
+              <p className="mt-1 text-sm text-white/70">{copy.statWorkspaceDetail}</p>
+            </div>
+            <div className="subscription-mini-panel pb-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">{copy.sectionCheckout}</p>
+              <p className="mt-2 text-2xl font-semibold text-cyan-200">{copy.statCheckout}</p>
+              <p className="mt-1 text-sm text-white/70">{copy.statCheckoutDetail}</p>
             </div>
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-14 pt-12">
-          <div className="max-w-4xl">
-            <div className="mb-5 flex flex-wrap gap-2 text-xs uppercase tracking-[0.22em] text-cyan-300/80">
-              <span className="subscription-shimmer-border rounded-full bg-fuchsia-400/8 px-3 py-1 text-cyan-200">Subscription Architecture</span>
-            </div>
-
-            <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-cyan-200 text-glow-sm md:text-6xl">
-              Planes de Conectividad
-            </h1>
-
-            <p className="mt-5 max-w-3xl text-base leading-7 text-white/72 md:text-lg">
-              Conectividad por nivel: agentes asignados, modelos disponibles y acceso progresivo a opciones
-              tacticas, premium, enterprise y experimentales.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-4 md:grid-cols-4">
-            <div className="subscription-mini-panel pb-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">FREE</p>
-              <p className="mt-2 text-2xl font-semibold text-cyan-200">3 agentes</p>
-              <p className="mt-1 text-sm text-white/70">Modelos base con ruta gratuita controlada.</p>
-            </div>
-            <div className="subscription-mini-panel pb-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Premium</p>
-              <p className="mt-2 text-2xl font-semibold text-cyan-200">20+ opciones</p>
-              <p className="mt-1 text-sm text-white/70">Claude, Gemini, GPT, Qwen, Command y Arctic.</p>
-            </div>
-            <div className="subscription-mini-panel pb-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Enterprise</p>
-              <p className="mt-2 text-2xl font-semibold text-cyan-200">8 agentes</p>
-              <p className="mt-1 text-sm text-white/70">Modelos preview y razonamiento para escala.</p>
-            </div>
-            <div className="subscription-mini-panel pb-4">
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Alliance</p>
-              <p className="mt-2 text-2xl font-semibold text-cyan-200">8+ agentes</p>
-              <p className="mt-1 text-sm text-white/70">Todos los anteriores mas modelos raros.</p>
+        <section className="mx-auto max-w-7xl px-6 pb-10">
+          <div className="subscription-shimmer-border overflow-hidden rounded-2xl bg-black/35 backdrop-blur-xl">
+            <div className="grid gap-4 border-b border-cyan-300/15 p-5 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { icon: featureIcons.agents, title: copy.sectionAgents, text: copy.sectionAgentsDetail },
+                { icon: featureIcons.models, title: copy.sectionRouting, text: copy.sectionRoutingDetail },
+                { icon: featureIcons.google, title: copy.sectionWorkspace, text: copy.sectionWorkspaceDetail },
+                { icon: featureIcons.workspace, title: copy.sectionProjects, text: copy.sectionProjectsDetail },
+              ].map(({ icon: Icon, title, text }) => (
+                <div key={title} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <Icon className="h-5 w-5 text-cyan-300" />
+                  <h3 className="mt-3 text-sm font-semibold text-cyan-200">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/70">{text}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         <section className="mx-auto max-w-7xl px-6 pb-12">
-          <div className="subscription-shimmer-border overflow-hidden rounded-2xl bg-black/35 backdrop-blur-xl">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left">
-                <thead className="border-b border-cyan-300/20 bg-white/5 text-xs uppercase tracking-[0.22em] text-amber-300">
-                  <tr>
-                    <th className="px-5 py-4 font-medium">Plan</th>
-                    <th className="px-5 py-4 font-medium">Agentes</th>
-                    <th className="px-5 py-4 font-medium">Modelos Disponibles (20+ opciones)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {plans.map((plan) => {
-                    const Icon = plan.icon;
-                    return (
-                      <tr key={plan.key} className="border-b border-white/6 transition hover:bg-cyan-300/5 last:border-b-0">
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`rounded-xl bg-gradient-to-br p-[1px] ${plan.accent}`}>
-                              <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-slate-950 text-white">
-                                <Icon className="h-5 w-5" />
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-cyan-200">{plan.displayPlan}</p>
-                              <p className="text-xs text-amber-200/80">{plan.badge}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          <p className="text-2xl font-semibold text-cyan-200">{plan.agents}</p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex max-w-4xl flex-wrap gap-2">
-                            {plan.models.map((model) => (
-                              <span key={model} className="rounded-full border border-cyan-300/20 bg-cyan-300/8 px-3 py-1 text-sm text-white/90">
-                                {model}
-                              </span>
-                            ))}
-                            {plan.exclusiveModels?.map((model) => (
-                              <span key={model} className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-sm text-amber-100">
-                                {model}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-7xl px-6 pb-24">
           <div className="mb-8 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Planes detallados</p>
-              <h2 className="mt-2 text-3xl font-semibold text-cyan-200 text-glow-sm">Conectividad por capacidad, modelos y agentes</h2>
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Planes</p>
+              <h2 className="mt-2 text-3xl font-semibold text-cyan-200 text-glow-sm">{copy.plansTitle}</h2>
             </div>
             <div className="subscription-shimmer-border hidden items-center gap-2 rounded-full bg-black/30 px-4 py-2 text-sm text-white/75 lg:flex">
               <ShieldCheck className="h-4 w-4 text-cyan-300" />
-              Seleccionas plan, guardamos la senal y activamos la ruta de modelos.
+              Guarda el contexto del plan y actualiza la capa operativa.
             </div>
           </div>
 
@@ -467,9 +470,11 @@ const Suscripciones = () => {
                   </div>
 
                   <div className="mt-6 flex items-end gap-2">
-                    <span className="text-5xl font-semibold text-cyan-200">{plan.agents}</span>
+                    <span className="text-5xl font-semibold text-cyan-200">{plan.agentLimit}</span>
                     <span className="pb-1 text-base font-medium text-amber-200">agentes</span>
-                    <span className="ml-auto pb-1 text-base font-medium text-white/82">{plan.price} {plan.cadence}</span>
+                    <span className="ml-auto pb-1 text-base font-medium text-white/82">
+                      {plan.price} {plan.cadence}
+                    </span>
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -477,26 +482,26 @@ const Suscripciones = () => {
                       {plan.badge}
                     </span>
                     <span className="rounded-full border border-cyan-400/20 bg-cyan-400/8 px-3 py-1 text-sm font-semibold text-white">
-                      {plan.idealFor}
+                      {plan.tier}
                     </span>
                   </div>
 
                   <div className="mt-5 rounded-xl border border-cyan-300/15 bg-white/4 px-4 py-3">
-                    <p className="text-sm uppercase tracking-[0.22em] text-amber-300">Modelos disponibles</p>
+                    <p className="text-sm uppercase tracking-[0.22em] text-amber-300">Lo que desbloquea</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {[...plan.models, ...(plan.exclusiveModels || [])].map((model) => (
-                        <span key={model} className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs text-white/86">
-                          {model}
+                      {[...plan.features, ...plan.productFit].map((feature) => (
+                        <span key={feature} className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs text-white/86">
+                          {feature}
                         </span>
                       ))}
                     </div>
-                    <p className="mt-3 text-sm font-semibold leading-6 text-cyan-100">{plan.juicy}</p>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-cyan-100">{plan.modelRouting}</p>
                   </div>
 
                   <ul className="mt-5 space-y-3">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex gap-3 text-sm font-medium leading-6 text-white/88">
-                        <Sparkles className="mt-1 h-4 w-4 shrink-0 text-amber-300" />
+                        <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-300" />
                         <span>{feature}</span>
                       </li>
                     ))}
@@ -517,14 +522,16 @@ const Suscripciones = () => {
                       ? 'Guardando...'
                       : isSubmitted
                         ? 'Solicitud guardada'
-                        : plan.buttonLabel}
+                        : plan.key === 'FREE_30_DAYS'
+                          ? 'Activar trial'
+                          : 'Ir a Stripe'}
                     <ArrowRight className="h-4 w-4" />
                   </button>
 
-                  {isSpotlight && (
+                      {isSpotlight && (
                     <div className="mt-4 flex items-center gap-2 text-sm text-fuchsia-200/90">
                       <Gem className="h-4 w-4" />
-                      Punto dulce de conectividad: potencia premium sin complejidad enterprise.
+                      {copy.spotlightDescription}
                     </div>
                   )}
                 </article>
@@ -536,29 +543,23 @@ const Suscripciones = () => {
         <section className="border-t border-white/10 bg-black/30">
           <div className="mx-auto grid max-w-7xl gap-6 px-6 py-12 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Cierre operativo</p>
-              <h3 className="mt-3 text-3xl font-semibold text-cyan-200">Mas agentes, mas modelos, mejor conectividad</h3>
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300">{copy.summaryBadge}</p>
+              <h3 className="mt-3 text-3xl font-semibold text-cyan-200">{copy.summaryTitle}</h3>
               <p className="mt-4 max-w-3xl text-base leading-7 text-white/68">
-                FREE prueba la ruta base. Tactical suma ejecucion. Premium abre modelos serios.
-                Mastermind sube razonamiento. Enterprise escala operaciones. Alliance desbloquea
-                todos los anteriores y modelos raros para expansion.
+                {copy.summaryBody}
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="border border-white/10 bg-white/4 p-4">
                 <Rocket className="h-5 w-5 text-cyan-300" />
-                <p className="mt-3 text-sm font-semibold text-cyan-200">FREE controlado</p>
-                <p className="mt-2 text-sm leading-6 text-white/62">
-                  3 agentes, modelos base y limite gratuito con respuesta limpia.
-                </p>
+                <p className="mt-3 text-sm font-semibold text-cyan-200">{copy.trialCardTitle}</p>
+                <p className="mt-2 text-sm leading-6 text-white/62">{copy.trialCardBody}</p>
               </div>
               <div className="border border-white/10 bg-white/4 p-4">
-                <Crown className="h-5 w-5 text-fuchsia-300" />
-                <p className="mt-3 text-sm font-semibold text-cyan-200">Alliance experimental</p>
-                <p className="mt-2 text-sm leading-6 text-white/62">
-                  Todos los modelos anteriores mas Recursal, MythoMax, Dolphin y Cosmos.
-                </p>
+                <DollarSign className="h-5 w-5 text-fuchsia-300" />
+                <p className="mt-3 text-sm font-semibold text-cyan-200">{copy.paidCardTitle}</p>
+                <p className="mt-2 text-sm leading-6 text-white/62">{copy.paidCardBody}</p>
               </div>
             </div>
           </div>

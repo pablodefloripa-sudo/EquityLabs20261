@@ -1,6 +1,7 @@
 import React, { useState, useCallback, createContext, useContext, ReactNode } from 'react';
+import { getBrowserLandingLang, getStoredLandingLang } from '@/components/landing/landingContent';
 
-export type Language = 'EN' | 'ES' | 'PT' | 'DE' | 'IT' | 'FR';
+export type Language = 'EN' | 'ES' | 'PT' | 'DE' | 'IT' | 'FR' | 'NL' | 'PL';
 
 interface LanguageContextType {
   language: Language;
@@ -9,6 +10,48 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+const mapLandingLangToAppLanguage = (lang: string): Language => {
+  switch (lang) {
+    case 'es':
+      return 'ES';
+    case 'pt':
+      return 'PT';
+    case 'de':
+      return 'DE';
+    case 'it':
+      return 'IT';
+    case 'fr':
+      return 'FR';
+    case 'nl':
+      return 'NL';
+    case 'pl':
+      return 'PL';
+    default:
+      return 'EN';
+  }
+};
+
+const mapAppLanguageToLandingLang = (lang: Language): string => {
+  switch (lang) {
+    case 'ES':
+      return 'es';
+    case 'PT':
+      return 'pt';
+    case 'DE':
+      return 'de';
+    case 'IT':
+      return 'it';
+    case 'FR':
+      return 'fr';
+    case 'NL':
+      return 'nl';
+    case 'PL':
+      return 'pl';
+    default:
+      return 'en';
+  }
+};
 
 // Common keys for sidebars (Metrics + Dashboard) and Operative Order
 const sidebarKeys = {
@@ -369,6 +412,44 @@ const translations: Record<Language, Record<string, string>> = {
     'toast.exit': 'Deconnexion...',
     'toast.language': 'Langue changee en',
   },
+  NL: {
+    ...sidebarKeys.EN,
+    'nav.docs': 'Mijn Documenten',
+    'nav.save': 'Opslaan',
+    'nav.settings': 'Instellingen',
+    'nav.history': 'Geschiedenis',
+    'nav.exit': 'Afsluiten',
+    'nav.integrations': 'Integratiecentrum',
+    'chat.placeholder': 'Typ je bericht...',
+    'chat.start': 'Typ of spreek om te beginnen',
+    'chat.error': 'Sorry, er is een fout opgetreden bij het verwerken van je bericht.',
+    'feature.coming_soon': 'Functie binnenkort beschikbaar',
+    'toast.docs': 'Documenten openen...',
+    'toast.save': 'Project succesvol opgeslagen',
+    'toast.settings': 'Instellingenpaneel geopend',
+    'toast.history': 'Geschiedenis laden...',
+    'toast.exit': 'Uitloggen...',
+    'toast.language': 'Taal gewijzigd naar',
+  },
+  PL: {
+    ...sidebarKeys.EN,
+    'nav.docs': 'Moje Dokumenty',
+    'nav.save': 'Zapisz',
+    'nav.settings': 'Ustawienia',
+    'nav.history': 'Historia',
+    'nav.exit': 'Wyjdź',
+    'nav.integrations': 'Centrum Integracji',
+    'chat.placeholder': 'Wpisz wiadomość...',
+    'chat.start': 'Wpisz lub powiedz, aby zacząć',
+    'chat.error': 'Przepraszamy, wystąpił błąd podczas przetwarzania wiadomości.',
+    'feature.coming_soon': 'Funkcja wkrótce dostępna',
+    'toast.docs': 'Otwieranie dokumentów...',
+    'toast.save': 'Projekt zapisany pomyślnie',
+    'toast.settings': 'Panel ustawień otwarty',
+    'toast.history': 'Ładowanie historii...',
+    'toast.exit': 'Wylogowywanie...',
+    'toast.language': 'Język zmieniony na',
+  },
 };
 
 const languageNames: Record<Language, string> = {
@@ -378,6 +459,8 @@ const languageNames: Record<Language, string> = {
   DE: 'Deutsch',
   IT: 'Italiano',
   FR: 'Francais',
+  NL: 'Nederlands',
+  PL: 'Polski',
 };
 
 export const getLanguageName = (lang: Language): string => languageNames[lang];
@@ -389,12 +472,16 @@ interface LanguageProviderProps {
 export function LanguageProvider({ children }: LanguageProviderProps) {
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('app_language');
-    return (saved as Language) || 'ES';
+    if (saved) return saved as Language;
+
+    const landingLang = getStoredLandingLang() || getBrowserLandingLang();
+    return mapLandingLangToAppLanguage(landingLang);
   });
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('app_language', lang);
+    localStorage.setItem('eq_landing_lang', mapAppLanguageToLandingLang(lang));
   }, []);
 
   const t = useCallback((key: string): string => {

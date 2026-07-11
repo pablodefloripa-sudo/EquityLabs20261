@@ -55,6 +55,7 @@ export const MetricsSidebar = () => {
       title={t('side.metrics')}
       icon={<BarChart3 className="w-4 h-4" />}
       tabPosition="30%"
+      defaultOpen
     >
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground/60">

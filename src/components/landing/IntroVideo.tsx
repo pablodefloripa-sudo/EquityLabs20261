@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SkipForward } from 'lucide-react';
+import { SkipForward, Volume2, VolumeX } from 'lucide-react';
 
 interface Props {
   src: string;
@@ -16,6 +16,7 @@ interface Props {
 export const IntroVideo = ({ src, onEnded }: Props) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hidden, setHidden] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
 
   const captureLastFrame = (): string | null => {
     const v = videoRef.current;
@@ -61,10 +62,21 @@ export const IntroVideo = ({ src, onEnded }: Props) => {
     v.addEventListener('ended', handleEnd);
 
     v.muted = true;
+    v.volume = 0.85;
     v.play().catch(() => {});
     return () => v.removeEventListener('ended', handleEnd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !soundOn;
+    if (soundOn) {
+      v.volume = 0.85;
+      v.play().catch(() => {});
+    }
+  }, [soundOn]);
 
   if (hidden) return null;
 
@@ -96,6 +108,13 @@ export const IntroVideo = ({ src, onEnded }: Props) => {
           transition={{ duration: 0.5 }}
           className="absolute bottom-6 right-6 z-50 flex gap-2"
         >
+          <button
+            onClick={() => setSoundOn((value) => !value)}
+            className="flex h-10 items-center gap-2 rounded-full border border-cyan-400/40 bg-black/60 px-4 text-xs font-mono tracking-wider text-cyan-300 transition-colors hover:border-cyan-300"
+          >
+            {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            {soundOn ? 'SOUND ON' : 'SOUND OFF'}
+          </button>
           <button
             onClick={finish}
             className="px-4 h-10 rounded-full bg-black/60 border border-cyan-400/40 text-cyan-300 text-xs font-mono tracking-wider flex items-center gap-2 hover:border-cyan-300 transition-colors"

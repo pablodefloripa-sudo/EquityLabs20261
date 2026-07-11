@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { LandingLang } from './LanguageFloater';
 import { CursorTrail } from './CursorTrail';
+import { resolveLandingSlideFallbackUrl, resolveLandingSlideUrl } from './landingContent';
 
 interface Props {
   lang: LandingLang;
@@ -12,12 +13,6 @@ interface Props {
 
 const SLIDE_COUNT = 5;
 const AUTO_MS = 5200;
-
-const slideUrl = (_lang: LandingLang, idx: number) => {
-  // Intro slides are English for now. Add language codes here when localized assets exist.
-  const code = 'en';
-  return `/slides/${code}/${code}-${idx + 1}.jpg`;
-};
 
 export const IntroSequence = ({ lang, onComplete, visualScale = 1 }: Props) => {
   const [index, setIndex] = useState(0);
@@ -47,10 +42,10 @@ export const IntroSequence = ({ lang, onComplete, visualScale = 1 }: Props) => {
       <AnimatePresence mode="sync">
         <motion.img
           key={index}
-          src={slideUrl(lang, index)}
+          src={resolveLandingSlideUrl(lang, index)}
           onError={(e) => {
             const img = e.currentTarget;
-            if (!img.src.includes('/en/')) img.src = `/slides/en/en-${index + 1}.jpg`;
+            if (!img.src.includes('/slides/en/')) img.src = resolveLandingSlideFallbackUrl(index);
           }}
           alt=""
           aria-hidden

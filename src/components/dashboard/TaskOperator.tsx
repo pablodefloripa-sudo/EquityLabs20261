@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Brain,
@@ -9,6 +9,7 @@ import {
   Code2,
   Copy,
   Folder,
+  FolderOpen,
   Megaphone,
   Plus,
   Rocket,
@@ -28,6 +29,38 @@ import { useLanguage } from '@/hooks/useLanguage';
 type OperationMode = 'seo' | 'fullstack' | 'copywriter' | 'debug';
 type CreativityLevel = 'precision' | 'balanced' | 'brainstorm';
 
+type DashboardContext = {
+  activeAgent?: {
+    id?: string;
+    name?: string;
+    engine?: string;
+    tasks?: string[];
+  };
+  subscription?: {
+    key?: string;
+    tier?: string;
+    displayPlan?: string;
+    agentLimit?: string;
+    models?: string[];
+  } | null;
+  updatedAt?: string;
+};
+
+type SavedMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+};
+
+type RecentProject = {
+  id: string;
+  name: string;
+  date: string;
+  messages: SavedMessage[];
+  context?: DashboardContext;
+};
+
 interface QuickInjectors {
   concise: boolean;
   humanExplain: boolean;
@@ -41,9 +74,11 @@ interface WinningPrompt {
   timestamp: string;
 }
 
-const initialProjects = [
-  { id: '1', name: 'EQuityLabs Core v1', date: '2026-07-01' },
-  { id: '2', name: 'SEO Cluster Finanzas', date: '2026-06-28' },
+const PROJECTS_STORAGE_KEY = 'eq_recent_projects';
+
+const initialProjects: RecentProject[] = [
+  { id: '1', name: 'EQuityLabs Core v1', date: '2026-07-01', messages: [] },
+  { id: '2', name: 'SEO Cluster Finanzas', date: '2026-06-28', messages: [] },
 ];
 
 const MODES: { key: OperationMode; labelKey: string; icon: React.ComponentType<{ className?: string }>; descKey: string; color: string }[] = [
@@ -66,7 +101,22 @@ export function TaskOperator() {
   const [injectors, setInjectors] = useState<QuickInjectors>({ concise: false, humanExplain: true, markdown: true });
   const [mission, setMission] = useState('');
   const [projectView, setProjectView] = useState<'list' | 'new'>('list');
-  const [projects, setProjects] = useState(initialProjects);
+  const [projects, setProjects] = useState<RecentProject[]>(() => {
+    try {
+      const saved = localStorage.getItem(PROJECTS_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : initialProjects;
+    } catch {
+      return initialProjects;
+    }
+  });
+  const [dashboardContext, setDashboardContext] = useState<DashboardContext>(() => {
+    try {
+      const saved = localStorage.getItem('eq_subscription_context');
+      return { subscription: saved ? JSON.parse(saved) : null };
+    } catch {
+      return { subscription: null };
+    }
+  });
   const [formData, setFormData] = useState({
     name: '',
     targetEquityTime: '',
@@ -79,6 +129,33 @@ export function TaskOperator() {
   ]);
 
   const activeCreativity = CREATIVITY.findIndex(c => c.key === creativity);
+  const assignedAgents = useMemo(() => {
+    const limit = dashboardContext.subscription?.agentLimit || '3';
+    return limit.includes('+') ? '8+ agentes' : `${limit} agentes`;
+  }, [dashboardContext.subscription?.agentLimit]);
+
+  useEffect(() => {
+    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+  }, [projects]);
+
+  useEffect(() => {
+    const handleAgentSelected = (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: string; name?: string; engine?: string; tasks?: string[] }>).detail || {};
+      setDashboardContext(prev => ({
+        ...prev,
+        activeAgent: {
+          id: detail.id,
+          name: detail.name,
+          engine: detail.engine,
+          tasks: detail.tasks || [],
+        },
+        updatedAt: new Date().toISOString(),
+      }));
+    };
+
+    window.addEventListener('eq:agent-selected', handleAgentSelected);
+    return () => window.removeEventListener('eq:agent-selected', handleAgentSelected);
+  }, []);
 
   const toggleInjector = (key: keyof QuickInjectors) => {
     setInjectors(prev => ({ ...prev, [key]: !prev[key] }));
@@ -106,11 +183,61 @@ export function TaskOperator() {
     if (!formData.name.trim()) return;
 
     setProjects(prev => [
-      { id: Date.now().toString(), name: formData.name.trim(), date: '2026-07-07' },
+      {
+        id: Date.now().toString(),
+        name: formData.name.trim(),
+        date: new Date().toISOString().slice(0, 10),
+        messages: [],
+        context: dashboardContext,
+      },
       ...prev,
     ]);
     setFormData({ name: '', targetEquityTime: '', goals: '', pains: '' });
     setProjectView('list');
+  };
+
+  const getLiveProjectSnapshot = (project: RecentProject): RecentProject => {
+    const liveMessages = ((window as unknown as {
+      __eqMessages?: Array<{ id?: string; role: string; content: string; timestamp?: Date | string }>;
+    }).__eqMessages || [])
+      .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content?.trim())
+      .map(m => ({
+        id: m.id || crypto.randomUUID(),
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: m.timestamp ? new Date(m.timestamp).toISOString() : new Date().toISOString(),
+      }));
+
+    const liveContext = (window as unknown as { __eqDashboardContext?: DashboardContext }).__eqDashboardContext;
+    return {
+      ...project,
+      date: new Date().toISOString().slice(0, 10),
+      messages: liveMessages.length ? liveMessages : project.messages,
+      context: liveContext || dashboardContext || project.context,
+    };
+  };
+
+  const openProject = (project: RecentProject) => {
+    const snapshot = getLiveProjectSnapshot(project);
+    setProjects(prev => prev.map(item => (item.id === project.id ? snapshot : item)));
+    sessionStorage.setItem('eq_resume_session', JSON.stringify({
+      project_id: snapshot.id,
+      project_name: snapshot.name,
+      messages: snapshot.messages,
+      context: snapshot.context,
+    }));
+    window.dispatchEvent(new CustomEvent('eq:resume-session', {
+      detail: {
+        project_id: snapshot.id,
+        project_name: snapshot.name,
+        messages: snapshot.messages,
+        context: snapshot.context,
+      },
+    }));
+  };
+
+  const deleteProject = (projectId: string) => {
+    setProjects(prev => prev.filter(project => project.id !== projectId));
   };
 
   return (
@@ -120,8 +247,26 @@ export function TaskOperator() {
       icon={<Rocket className="w-4 h-4" />}
       tabPosition="18%"
       widthClassName="w-[450px] max-w-[92vw]"
+      defaultOpen
     >
       <div className="space-y-5">
+        <div className="rounded-xl border border-cyan-400/20 bg-black/35 p-3">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-cyan-300/70">Contexto activo</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/5 px-2 py-2">
+              <span className="block text-slate-500">Agente</span>
+              <strong className="block truncate text-cyan-100">{dashboardContext.activeAgent?.name || 'Sin seleccionar'}</strong>
+            </div>
+            <div className="rounded-lg border border-emerald-300/15 bg-emerald-300/5 px-2 py-2">
+              <span className="block text-slate-500">Suscripcion</span>
+              <strong className="block truncate text-emerald-100">{dashboardContext.subscription?.displayPlan || 'FREE'}</strong>
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">
+            Ruta activa: {assignedAgents} usando {dashboardContext.activeAgent?.engine || 'modelo disponible'}.
+          </p>
+        </div>
+
         <div className="relative overflow-hidden rounded-xl border border-cyan-400/25 bg-[linear-gradient(140deg,rgba(8,145,178,0.18),rgba(15,23,42,0.62)_48%,rgba(30,41,59,0.82))] p-4 shadow-[0_0_28px_rgba(34,211,238,0.12)]">
           <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300" />
           <div className="mb-3 flex items-center gap-2">
@@ -221,16 +366,34 @@ export function TaskOperator() {
                 {projects.map(project => (
                   <div
                     key={project.id}
-                    className="group flex cursor-pointer items-center justify-between rounded-lg border border-[#1e293b] bg-[#111827] p-3 transition-all hover:border-cyan-500/50"
+                    className="group flex items-center justify-between gap-2 rounded-lg border border-[#1e293b] bg-[#111827] p-3 transition-all hover:border-cyan-500/50"
                   >
                     <div className="flex items-center gap-3">
                       <div className="rounded bg-slate-800 p-2 text-cyan-400 transition-colors group-hover:bg-cyan-950/50">
                         <Folder size={16} />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="text-sm font-medium text-slate-200 transition-colors group-hover:text-cyan-300">{project.name}</h4>
                         <p className="text-[11px] text-slate-500">Modificado: {project.date}</p>
                       </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openProject(project)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/8 text-cyan-200 transition hover:border-cyan-200/50 hover:bg-cyan-300/14"
+                        title="Abrir proyecto"
+                      >
+                        <FolderOpen size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteProject(project.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-300/20 bg-red-400/8 text-red-200 transition hover:border-red-200/50 hover:bg-red-400/14"
+                        title="Eliminar proyecto"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   </div>
                 ))}

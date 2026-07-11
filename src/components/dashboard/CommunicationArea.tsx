@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus, ShieldCheck } from 'lucide-react';
+import { Zap, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus, ShieldCheck, BarChart3 } from 'lucide-react';
 import { InlineToolsPanel } from './InlineToolsPanel';
 import { AgentResponsePanel } from './AgentResponsePanel';
 import { MascotGreeting } from './MascotGreeting';
@@ -31,6 +31,37 @@ interface Message {
 interface CommunicationAreaProps {
   onEnterFocusMode: () => void;
 }
+
+type AgentProjectForm = {
+  projectName: string;
+  objective: string;
+  mainMetric: string;
+  targetValue: string;
+  deadline: string;
+  dataSource: string;
+};
+
+const emptyAgentProjectForm: AgentProjectForm = {
+  projectName: '',
+  objective: '',
+  mainMetric: '',
+  targetValue: '',
+  deadline: '',
+  dataSource: '',
+};
+
+const metricFields: Array<{
+  key: keyof AgentProjectForm;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: 'projectName', label: 'Proyecto', placeholder: 'Ej: Velvet Revenue Sprint' },
+  { key: 'objective', label: 'Objetivo', placeholder: 'Resultado que queres lograr' },
+  { key: 'mainMetric', label: 'Metrica principal', placeholder: 'Ej: conversion, ingresos, leads' },
+  { key: 'targetValue', label: 'Meta', placeholder: 'Ej: +18%, 50 leads, $10k' },
+  { key: 'deadline', label: 'Fecha limite', placeholder: 'Ej: 30 dias, 2026-08-15' },
+  { key: 'dataSource', label: 'Fuente de datos', placeholder: 'Sheets, CRM, manual, Analytics' },
+];
 
 const StatusLEDs = ({ isThinking }: { isThinking: boolean }) => (
   <div className="flex items-center gap-2">
@@ -101,6 +132,8 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   const [mascotTask, setMascotTask] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [responseScale, setResponseScale] = useState(1);
+  const [activeAgentName, setActiveAgentName] = useState<string | null>(null);
+  const [agentProjectForm, setAgentProjectForm] = useState<AgentProjectForm>(emptyAgentProjectForm);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguage();
@@ -140,12 +173,27 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   useEffect(() => {
     const handleAgentSelected = (event: Event) => {
       const detail = (event as CustomEvent<{
+        id?: string;
         name?: string;
         tasks?: string[];
         engine?: string;
       }>).detail || {};
       const agentName = detail.name || 'Agente';
       const command = buildAgentCommand(agentName, detail.tasks || [], detail.engine || 'FREE');
+      const subscriptionRaw = localStorage.getItem('eq_subscription_context');
+      const subscription = subscriptionRaw ? JSON.parse(subscriptionRaw) : null;
+      (window as unknown as {
+        __eqDashboardContext?: unknown;
+      }).__eqDashboardContext = {
+        activeAgent: {
+          id: detail.id,
+          name: agentName,
+          engine: detail.engine || 'FREE',
+          tasks: detail.tasks || [],
+        },
+        subscription,
+        updatedAt: new Date().toISOString(),
+      };
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
@@ -158,8 +206,10 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
           proposals: command.proposals,
         },
       }]);
-      setInputValue(command.prompt);
-      forceFocus();
+      setInputValue('');
+      setActiveAgentName(agentName);
+      setAgentProjectForm(emptyAgentProjectForm);
+      setToolsOpen(false);
     };
 
     window.addEventListener('eq:agent-selected', handleAgentSelected);
@@ -195,6 +245,9 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
           content: m.content,
           timestamp: new Date(m.timestamp),
         })));
+        if ((detail as { context?: unknown } | undefined)?.context) {
+          (window as unknown as { __eqDashboardContext?: unknown }).__eqDashboardContext = (detail as { context?: unknown }).context;
+        }
         sessionStorage.removeItem('eq_resume_session');
         forceFocus();
       }
@@ -316,6 +369,67 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
     }
   };
 
+  const updateAgentProjectField = (key: keyof AgentProjectForm, value: string) => {
+    setAgentProjectForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAgentProjectSubmit = async () => {
+    if (!activeAgentName || aiLoading) return;
+
+    const filled = metricFields
+      .map(field => `${field.label}: ${agentProjectForm[field.key].trim() || 'Pendiente'}`)
+      .join('\n');
+    const currentAgentName = activeAgentName;
+    const currentInput = [
+      `Activar ${currentAgentName} con este proyecto y llevar metricas operativas.`,
+      filled,
+      '',
+      'Devolve checkpoints, riesgos, permisos necesarios y primera accion medible.',
+    ].join('\n');
+
+    setMessages(prev => [...prev, {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: [
+        `**${currentAgentName} — tablero de metricas**`,
+        '',
+        filled,
+      ].join('\n'),
+      timestamp: new Date(),
+    }]);
+    setActiveAgentName(null);
+    setInputValue('');
+    forceFocus();
+
+    try {
+      const history = messages.map(m => ({ role: m.role, content: m.content }));
+      const response = await sendMessage(currentInput, history);
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date(),
+        model: currentAgentName,
+      }]);
+    } catch (error) {
+      console.error('Error sending agent metrics:', error);
+      const errorMessageText = error instanceof Error ? error.message : 'Error desconocido';
+      toast({
+        title: 'AI no disponible',
+        description: errorMessageText,
+        variant: 'destructive',
+      });
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: t('chat.error'),
+        timestamp: new Date(),
+      }]);
+    } finally {
+      forceFocus();
+    }
+  };
+
   const requestIntegration = (provider: string, reason: string) => {
     setMessages(prev => [...prev, {
       id: crypto.randomUUID(),
@@ -342,14 +456,14 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   };
 
   return (
-    <div className="flex flex-col flex-1 justify-end min-h-0 mx-auto w-full px-[57px]">
+    <div className="flex flex-col flex-1 justify-end min-h-0 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
       {/* Waveform */}
       <div className="absolute top-1 left-1/2 -translate-x-1/2 w-48 z-10">
         <VoiceWaveform state={getWaveformState()} />
       </div>
 
       {/* Messages */}
-      <div className="flex flex-col flex-1 justify-end px-1 pb-0 min-h-0" style={{ marginBottom: 0 }}>
+      <div className="flex flex-col flex-1 justify-end px-1 pb-0 min-h-0">
         {messages.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -359,8 +473,8 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
             <p className="text-muted-foreground/40 text-xs font-mono tracking-widest">{t('chat.start')}</p>
           </motion.div>
         ) : (
-          <div className="flex-1 overflow-y-auto scrollbar-thin mb-1 max-h-[75vh]">
-            <div className="space-y-3 w-full">
+          <div className="flex-1 overflow-y-auto scrollbar-thin mb-1 max-h-[72vh]">
+            <div className="mx-auto w-full max-w-4xl space-y-3">
               {messages.map((msg, index) => (
                 <motion.div
                   key={msg.id}
@@ -464,8 +578,77 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
       </div>
 
       {/* Command Console - flush to bottom with 0.5rem margin */}
-      <div className="w-full px-[1px] pb-2 relative">
+      <div className="relative w-full pb-2">
         <InlineToolsPanel open={toolsOpen} onClose={() => setToolsOpen(false)} />
+        {activeAgentName ? (
+          <motion.div
+            key={activeAgentName}
+            initial={{ opacity: 0, y: 34, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            className="relative mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-cyan-300/55 bg-black/60 backdrop-blur-2xl"
+            style={{
+              boxShadow: '0 0 44px rgba(34,211,238,0.34), inset 0 0 24px rgba(6,182,212,0.16)',
+            }}
+          >
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-200/90 to-transparent" />
+            <div className="relative border-b border-cyan-300/18 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-300/35 bg-cyan-300/12 text-cyan-200">
+                  <BarChart3 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate font-display text-lg font-semibold tracking-wide text-cyan-50">
+                    {activeAgentName}
+                  </h2>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/60">
+                    Formulario de metricas
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+              {metricFields.map((field, index) => (
+                <motion.label
+                  key={field.key}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.55, delay: 0.12 + index * 0.08 }}
+                  className="rounded-xl border border-cyan-300/16 bg-cyan-300/7 px-3 py-2"
+                >
+                  <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/70">
+                    {field.label}
+                  </span>
+                  <input
+                    value={agentProjectForm[field.key]}
+                    onChange={(event) => updateAgentProjectField(field.key, event.target.value)}
+                    placeholder={field.placeholder}
+                    className="h-8 w-full bg-transparent text-sm text-cyan-50 outline-none placeholder:text-cyan-100/24"
+                  />
+                </motion.label>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t border-cyan-300/14 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setActiveAgentName(null)}
+                className="rounded-xl border border-red-300/25 bg-red-400/8 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-100/80 transition hover:bg-red-400/14"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={handleAgentProjectSubmit}
+                disabled={aiLoading}
+                className="rounded-xl border border-cyan-300/50 bg-cyan-300/16 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/14 hover:text-emerald-100"
+              >
+                {aiLoading ? 'Procesando' : 'Llevar metricas'}
+              </button>
+            </div>
+          </motion.div>
+        ) : (
         <motion.div
           animate={{
             scale: isFocused ? 1.004 : 1,
@@ -474,7 +657,7 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               : '0 0 32px rgba(34,211,238,0.30), 0 0 16px rgba(6,182,212,0.25) inset, 0 14px 28px rgba(0,0,0,0.55)',
           }}
           transition={{ duration: 0.25 }}
-          className="relative flex flex-col gap-0 rounded-2xl overflow-hidden border border-cyan-300/60"
+          className="relative mx-auto flex w-full max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl border border-cyan-300/60"
           style={{
             background: 'linear-gradient(160deg, rgba(8,145,178,0.18) 0%, rgba(6,182,212,0.10) 40%, rgba(0,0,0,0.55) 100%)',
             backdropFilter: 'blur(28px) saturate(160%)',
@@ -495,7 +678,7 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
           </div>
 
           {/* Textarea row — vivid cyan-tinted black */}
-          <div className="relative px-3 py-3 mx-2 my-1 rounded-2xl" style={{ background: 'linear-gradient(180deg, rgba(0,20,30,0.92) 0%, rgba(0,12,20,0.95) 100%)', boxShadow: 'inset 0 1px 0 rgba(34,211,238,0.35), inset 0 -1px 0 rgba(0,0,0,0.6)' }}>
+          <div className="relative mx-2 my-1 rounded-2xl px-4 py-4 sm:px-5" style={{ background: 'linear-gradient(180deg, rgba(0,20,30,0.92) 0%, rgba(0,12,20,0.95) 100%)', boxShadow: 'inset 0 1px 0 rgba(34,211,238,0.35), inset 0 -1px 0 rgba(0,0,0,0.6)' }}>
 
             <textarea
               ref={textareaRef}
@@ -508,8 +691,8 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               disabled={aiLoading}
               autoFocus
               rows={1}
-              className="w-full bg-transparent border-none outline-none resize-none text-foreground/90 text-lg font-display placeholder:text-muted-foreground/30 leading-relaxed scrollbar-thin caret-primary overflow-y-auto"
-              style={{ minHeight: '28px', maxHeight: '164px', caretColor: 'hsl(var(--primary))', fontSize: '18px' }}
+              className="w-full bg-transparent border-none outline-none resize-none text-foreground/95 text-xl font-display placeholder:text-muted-foreground/30 leading-relaxed scrollbar-thin caret-primary overflow-y-auto text-center sm:text-left"
+              style={{ minHeight: '36px', maxHeight: '184px', caretColor: 'hsl(var(--primary))', fontSize: '20px' }}
             />
           </div>
 
@@ -546,6 +729,7 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
             </Button>
           </div>
         </motion.div>
+        )}
       </div>
 
       <MascotTaskDialog

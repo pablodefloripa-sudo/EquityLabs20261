@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Suscripciones from "./pages/Suscripciones";
+import Diagnostico from "./pages/Diagnostico";
 import { AuthGuard } from "./components/auth/AuthGuard";
 import { LanguageProvider } from "./hooks/useLanguage";
 
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/suscripciones" element={<Suscripciones />} />
+            <Route path="/diagnostico" element={<Diagnostico />} />
             <Route path="/dashboard" element={
               <AuthGuard>
                 <Index />

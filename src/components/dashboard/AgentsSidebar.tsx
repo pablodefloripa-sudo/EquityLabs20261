@@ -1,7 +1,8 @@
 import { useState, useCallback, memo } from 'react';
 import { Wrench, Zap, Shield } from 'lucide-react';
 import { CollapsibleSidebar } from './CollapsibleSidebar';
-import { BunkerModal, getAgentIcon, isProAgent } from './BunkerModal';
+import { BunkerModal } from './BunkerModal';
+import { getAgentIcon, isProAgent } from './agentMeta';
 import { useAgentI18n, type Agent } from '@/hooks/useAgentI18n';
 
 const AgentCard = memo(({

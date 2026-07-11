@@ -37,6 +37,10 @@ export const ProjectDashboard = () => {
     setIsProjectManagerOpen(true);
   }, []);
 
+  const handleOpenSubscriptions = useCallback(() => {
+    navigate('/suscripciones');
+  }, [navigate]);
+
   const handleSettings = useCallback(() => {
     setIsWallpaperOpen(true);
     toast({ title: t('nav.settings'), description: t('toast.settings') });
@@ -102,6 +106,7 @@ export const ProjectDashboard = () => {
           onExit={handleExit}
           onOpenIntegrations={handleOpenIntegrations}
           onFocusConsole={handleFocusConsole}
+          onOpenSubscriptions={handleOpenSubscriptions}
         />
       </motion.div>
 
