@@ -18,13 +18,23 @@ const Auth = () => {
   const { connectGoogle, handleOAuthCallback } = useGoogleOAuth();
   const { toast } = useToast();
 
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const resolveAuthMode = () => {
+    if (location.pathname === '/register') return 'signup';
+    if (new URLSearchParams(location.search).get('mode') === 'signup') return 'signup';
+    return 'login';
+  };
+
+  const [mode, setMode] = useState<'login' | 'signup'>(resolveAuthMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOAuthResolving, setIsOAuthResolving] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMode(resolveAuthMode());
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const hasOAuthPayload = location.search.includes('code=') || location.hash.includes('access_token=');
