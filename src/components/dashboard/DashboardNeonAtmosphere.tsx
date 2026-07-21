@@ -75,41 +75,4 @@ const lines = [
   },
 ];
 
-export const DashboardNeonAtmosphere = () => {
-  return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.12),transparent_22%),radial-gradient(circle_at_84%_16%,rgba(168,85,247,0.11),transparent_24%),radial-gradient(circle_at_76%_78%,rgba(244,114,182,0.08),transparent_20%),radial-gradient(circle_at_18%_82%,rgba(34,197,94,0.07),transparent_18%)]" />
-      <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(34,211,238,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.04)_1px,transparent_1px)] [background-size:80px_80px]" />
-      <div className="absolute inset-y-0 left-[18%] w-px bg-gradient-to-b from-transparent via-cyan-300/35 to-transparent blur-[1px]" />
-      <div className="absolute inset-y-0 right-[22%] w-px bg-gradient-to-b from-transparent via-fuchsia-300/30 to-transparent blur-[1px]" />
-
-      {lines.map((line, index) => (
-        <motion.div
-          key={index}
-          className="absolute rounded-full"
-          style={{
-            top: line.top,
-            right: line.right,
-            bottom: line.bottom,
-            left: line.left,
-            width: line.width,
-            height: line.height,
-            rotate: `${line.rotate}deg`,
-            background: line.gradient,
-            boxShadow: line.shadow,
-          }}
-          animate={{
-            x: [0, line.x, 0],
-            y: [0, line.y, 0],
-            opacity: [0.35, 0.92, 0.35],
-          }}
-          transition={{
-            duration: line.duration,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
-    </div>
-  );
-};
+export const DashboardNeonAtmosphere = () => null;

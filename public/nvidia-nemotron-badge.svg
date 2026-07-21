@@ -1,0 +1,19 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="48" fill="#050806"/>
+  <rect x="24" y="24" width="464" height="464" rx="40" fill="url(#paint0_linear)" stroke="#4ADE80" stroke-opacity="0.38" stroke-width="2"/>
+  <path d="M112 170H400" stroke="#4ADE80" stroke-opacity="0.42" stroke-width="2"/>
+  <path d="M112 342H400" stroke="#4ADE80" stroke-opacity="0.18" stroke-width="2"/>
+  <circle cx="156" cy="256" r="52" fill="#4ADE80" fill-opacity="0.14" stroke="#4ADE80" stroke-opacity="0.42" stroke-width="2"/>
+  <path d="M140 256L155 241L175 261L189 247" stroke="#4ADE80" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M222 224H388" stroke="#D1FAE5" stroke-opacity="0.82" stroke-width="14" stroke-linecap="round"/>
+  <path d="M222 256H356" stroke="#D1FAE5" stroke-opacity="0.58" stroke-width="10" stroke-linecap="round"/>
+  <path d="M222 288H372" stroke="#4ADE80" stroke-opacity="0.9" stroke-width="12" stroke-linecap="round"/>
+  <text x="222" y="196" fill="#4ADE80" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="4">NVIDIA</text>
+  <text x="222" y="336" fill="#D1FAE5" fill-opacity="0.9" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" letter-spacing="2">NEMOTRON 3 ULTRA</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07100C"/>
+      <stop offset="1" stop-color="#020403"/>
+    </linearGradient>
+  </defs>
+</svg>

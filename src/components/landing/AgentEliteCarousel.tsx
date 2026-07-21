@@ -84,7 +84,10 @@ const accentCards = [
 
 interface Props {
   lang: LandingLang;
+  visualScale: number;
 }
+
+const ACTIVE_AGENT_STORAGE_KEY = 'eq_active_agent_context';
 
 type Agent = {
   id: string | number;
@@ -98,7 +101,7 @@ type Agent = {
   proTasks?: Record<string, string[]>;
 };
 
-export const AgentEliteCarousel = ({ lang }: Props) => {
+export const AgentEliteCarousel = ({ lang, visualScale }: Props) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const navigate = useNavigate();
@@ -130,10 +133,35 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
   };
 
   const handleFree = () => {
+    const agent = agents[activeIndex];
+    const name = (agent.name as Record<string, string>)[activeLang] || agent.name.en;
+    const freeTasksMap = (agent.freeTasks || {}) as Record<string, string[]>;
+    const freeTasks = freeTasksMap[activeLang] || freeTasksMap.en || [];
+    const persistedAgent = {
+      id: String(agent.id),
+      name,
+      engine: agent.freeModels?.[0] || 'modelo disponible',
+      tasks: freeTasks,
+      selectedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, JSON.stringify(persistedAgent));
     navigate('/suscripciones#free');
   };
 
   const handleUpgrade = () => {
+    const agent = agents[activeIndex];
+    const name = (agent.name as Record<string, string>)[activeLang] || agent.name.en;
+    const proTasksMap = (agent.proTasks || {}) as Record<string, string[]>;
+    const freeTasksMap = (agent.freeTasks || {}) as Record<string, string[]>;
+    const tasks = proTasksMap[activeLang] || proTasksMap.en || freeTasksMap[activeLang] || freeTasksMap.en || [];
+    const persistedAgent = {
+      id: String(agent.id),
+      name,
+      engine: agent.proModels?.[0] || agent.freeModels?.[0] || 'modelo disponible',
+      tasks,
+      selectedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, JSON.stringify(persistedAgent));
     navigate('/suscripciones');
   };
 
@@ -146,14 +174,29 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
   };
 
   const visible = getVisible();
+  const heroBandHeight = `${Math.max(16, Number((24 - Math.max(0, visualScale - 1) * 10).toFixed(2)))}vh`;
+  const heroBandMinHeight = `${Math.max(108, Number((168 - Math.max(0, visualScale - 1) * 86).toFixed(0)))}px`;
+  const heroBottomOffset = `${Math.max(8, Number((24 - Math.max(0, visualScale - 1) * 18).toFixed(0)))}px`;
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden relative pb-[38px]">
-      <div className="relative z-20 flex min-h-[164px] h-[23vh] items-center justify-center">
-        <GhostTyper text={phrases[activeIndex % phrases.length]} isActive key={`${activeIndex}-${activeLang}`} />
+      <div
+        className="pointer-events-none relative z-0 flex items-start justify-center"
+        style={{
+          minHeight: heroBandMinHeight,
+          height: heroBandHeight,
+          marginBottom: heroBottomOffset,
+        }}
+      >
+        <GhostTyper
+          text={phrases[activeIndex % phrases.length]}
+          isActive
+          visualScale={visualScale}
+          key={`${activeIndex}-${activeLang}-${visualScale}`}
+        />
       </div>
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-4">
+      <div className="relative z-20 flex min-h-0 flex-1 flex-col items-center justify-center px-4">
         <div className="relative flex h-full min-h-[500px] w-full max-w-7xl items-center justify-center">
           <AnimatePresence mode="popLayout">
             {visible.map((idx, pos) => {
@@ -171,7 +214,7 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
               const proTasksMap = (agent.proTasks || {}) as Record<string, string[]>;
               const freeTasks: string[] = freeTasksMap[activeLang] || freeTasksMap.en || [];
               const proTasks: string[] = proTasksMap[activeLang] || proTasksMap.en || [];
-              const baseScale = isCenter ? 1 : 0.56 - Math.abs(offset) * 0.04;
+              const baseScale = isCenter ? visualScale : 0.56 - Math.abs(offset) * 0.04;
               const finalScale = isHovered ? baseScale * 1.06 : baseScale;
 
               return (
@@ -194,7 +237,7 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                 >
                   <div
                     className={[
-                      'w-[min(92vw,472px)] md:w-[min(86vw,880px)] overflow-hidden rounded-lg border backdrop-blur-xl transition-all duration-500',
+                      'w-[min(92vw,472px)] md:w-[min(95vw,1180px)] overflow-hidden rounded-lg border backdrop-blur-xl transition-all duration-500',
                       isCenter
                         ? 'bg-black/50 border-cyan-400/30'
                         : isHovered
@@ -209,8 +252,8 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                           : undefined
                     }
                   >
-                    <div className="p-5 pb-4 sm:p-6 sm:pb-4">
-                      <div className="mb-4 flex items-center gap-3 border-b border-cyan-300/10 pb-4">
+                    <div className="p-4 pb-4 sm:p-5 sm:pb-4">
+                      <div className="mb-3 flex items-center gap-3 border-b border-cyan-300/10 pb-3">
                         <div
                           className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${
                             isCenter ? 'bg-cyan-400/15 text-cyan-200 border border-cyan-300/35' : 'bg-white/5 text-muted-foreground'
@@ -220,57 +263,57 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className={`font-mono text-[10px] ${isCenter ? 'text-cyan-300/80' : 'text-yellow-200/70'}`}>
+                            <span className={`font-mono ${isCenter ? 'text-[15px] md:text-[16px] text-cyan-200/90' : 'text-[11px] text-yellow-200/78'}`}>
                               #{String(agent.numId || idx + 1).padStart(2, '0')}
                             </span>
-                            <h3 className={`truncate font-display text-[15px] md:text-base font-bold ${isCenter ? 'text-white' : 'text-muted-foreground'}`}>
+                            <h3 className={`truncate font-display font-bold ${isCenter ? 'text-[26px] md:text-[30px] text-white' : 'text-[18px] md:text-[1.3rem] text-slate-300/85'}`}>
                               {name}
                             </h3>
                           </div>
-                          <span className={`mt-1 inline-block rounded-full border bg-gradient-to-r px-2 py-0.5 text-[9px] font-bold uppercase ${badge}`}>
+                          <span className={`mt-1 inline-block rounded-full border bg-gradient-to-r font-bold uppercase ${isCenter ? 'px-3 py-1 text-[11px] tracking-[0.16em]' : 'px-2.5 py-1 text-[10px]'} ${badge}`}>
                             {agent.badge}
                           </span>
                         </div>
                       </div>
 
-                      <p className={`mb-4 line-clamp-2 text-[12px] leading-relaxed ${isCenter ? 'text-cyan-50/78' : 'text-muted-foreground/50'}`}>
+                      <p className={`mb-4 line-clamp-3 ${isCenter ? 'text-[17px] md:text-[19px] leading-[1.38] text-cyan-50/88' : 'text-[14px] md:text-[15px] leading-relaxed text-slate-300/68'}`}>
                         {mission}
                       </p>
 
                       {isCenter ? (
-                        <div className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr]">
-                          <div className="rounded-lg border border-emerald-300/25 bg-emerald-300/10 p-3">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <span className="rounded bg-emerald-300/18 px-2 py-0.5 text-[10px] font-bold tracking-wider text-emerald-200">
-                                FREE (30 Dias Trial)
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                          <div className="flex h-full flex-col rounded-lg border border-emerald-300/25 bg-emerald-300/10 p-4">
+                            <div className="mb-3 flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-emerald-300/18 px-3 py-1 text-[16px] md:text-[18px] font-bold tracking-wider text-emerald-100">
+                                {planCopy.trialLabel}
                               </span>
-                              <span className="rounded-full border border-cyan-300/18 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-cyan-100/85">
+                              <span className="rounded-full border border-cyan-300/18 px-3 py-1 text-[16px] md:text-[18px] font-semibold tracking-wide text-cyan-50/90">
                                 {planCopy.freeLabel}
                               </span>
-                              <span className="truncate font-mono text-[10px] text-emerald-100/70">{freeModels.join(' - ')}</span>
+                              <span className="truncate font-mono text-[14px] md:text-[15px] text-emerald-50/85">{freeModels.join(' - ')}</span>
                             </div>
 
-                            <ul className="space-y-1">
+                            <ul className="space-y-2.5">
                               {freeTasks.map((task, index) => (
-                                <li key={index} className="flex gap-1.5 text-[11px] leading-snug text-emerald-50/74">
-                                  <span className="shrink-0 text-cyan-200/70">{'>'}</span>
-                                  <span className="line-clamp-1">{task}</span>
+                                <li key={index} className="flex gap-2 text-[16px] md:text-[17px] leading-[1.24] text-emerald-50/90">
+                                  <span className="shrink-0 text-cyan-100/90">{'>'}</span>
+                                  <span>{task}</span>
                                 </li>
                               ))}
                             </ul>
 
-                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                            <div className="mt-auto grid gap-2 pt-4 sm:grid-cols-3">
                               {planCopy.freeHighlights.map((item, index) => {
                                 const accent = accentCards[index % accentCards.length];
                                 return (
                                 <div
                                   key={item.title}
-                                  className={`rounded-lg border px-2.5 py-2 ${accent.border} ${accent.bg}`}
+                                  className={`flex h-full flex-col rounded-lg border px-3 py-3 ${accent.border} ${accent.bg}`}
                                 >
-                                  <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${accent.title}`}>
+                                  <p className={`text-[13px] md:text-[14px] font-semibold uppercase tracking-[0.12em] ${accent.title}`}>
                                     {item.title}
                                   </p>
-                                  <p className={`mt-1 text-[10px] leading-snug ${accent.body}`}>
+                                  <p className={`mt-1.5 text-[13px] md:text-[14px] leading-[1.3] ${accent.body}`}>
                                     {item.detail}
                                   </p>
                                 </div>
@@ -279,32 +322,32 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                             </div>
                           </div>
 
-                          <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-3">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <span className="rounded bg-cyan-300/18 px-2 py-0.5 text-[10px] font-bold tracking-wider text-cyan-200">
+                          <div className="flex h-full flex-col rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-4">
+                            <div className="mb-3 flex flex-wrap items-center gap-2">
+                              <span className="rounded bg-cyan-300/18 px-3 py-1 text-[16px] md:text-[18px] font-bold tracking-wider text-cyan-100">
                                 {planCopy.paidLabel}
                               </span>
-                              <span className="truncate font-mono text-[10px] text-cyan-100/80">
+                              <span className="truncate font-mono text-[14px] md:text-[15px] text-cyan-50/90">
                                 {proModels.slice(0, 4).join(' - ')}
                                 {proModels.length > 4 ? ' ...' : ''}
                               </span>
                             </div>
 
-                            <ul className="grid gap-1 sm:grid-cols-2">
+                            <ul className="grid gap-x-4 gap-y-2 xl:grid-cols-2">
                               {proTasks.map((task, index) => (
-                                <li key={index} className="flex gap-1.5 text-[11px] leading-snug text-cyan-50/82">
+                                <li key={index} className="flex gap-2 text-[16px] md:text-[17px] leading-[1.24] text-cyan-50/92">
                                   <span className={index % 4 === 0 ? 'shrink-0 text-cyan-200' : index % 4 === 1 ? 'shrink-0 text-emerald-200' : index % 4 === 2 ? 'shrink-0 text-yellow-200' : 'shrink-0 text-red-200'}>*</span>
-                                  <span className="line-clamp-1">{task}</span>
+                                  <span>{task}</span>
                                 </li>
                               ))}
                             </ul>
 
-                            <div className="mt-3 flex flex-wrap gap-1.5">
+                            <div className="mt-auto flex flex-wrap gap-2 pt-4">
                               {planCopy.paidHighlights.map((item, index) => (
                                 <span
                                   key={item}
                                   className={[
-                                    'rounded-md border px-2 py-1 text-[10px] font-semibold tracking-wide',
+                                    'rounded-md border px-3 py-1.5 text-[14px] md:text-[15px] font-semibold tracking-wide',
                                     index === 0
                                       ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100/90'
                                       : index === 1
@@ -320,13 +363,13 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                         </div>
                       ) : (
                         <div className="space-y-1.5 opacity-60">
-                          <div className="flex items-center gap-2 text-[10px]">
+                          <div className="flex items-center gap-2 text-[11px]">
                             <span className="rounded bg-emerald-500/15 px-2 py-0.5 font-bold text-emerald-400">{ui.free}</span>
-                            <span className="truncate font-mono text-muted-foreground/60">{freeModels.join(' - ')}</span>
+                            <span className="truncate font-mono text-slate-300/72">{freeModels.join(' - ')}</span>
                           </div>
-                          <div className="flex items-center gap-2 text-[10px]">
+                          <div className="flex items-center gap-2 text-[11px]">
                             <span className="rounded bg-cyan-400/20 px-2 py-0.5 font-bold text-cyan-300">{planCopy.paidLabel}</span>
-                            <span className="truncate font-mono text-cyan-300/70">{proModels[0]}</span>
+                            <span className="truncate font-mono text-cyan-200/82">{proModels[0]}</span>
                           </div>
                         </div>
                       )}
@@ -336,17 +379,17 @@ export const AgentEliteCarousel = ({ lang }: Props) => {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col gap-2 px-5 pb-5 sm:flex-row sm:px-6"
+                        className="flex flex-col gap-2 px-4 pb-4 sm:flex-row sm:px-5"
                       >
                         <button
                           onClick={handleFree}
-                          className="flex-1 rounded-lg border border-emerald-300/40 bg-emerald-300/15 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-200 transition-all hover:bg-emerald-300/25"
+                          className="flex-1 rounded-lg border border-emerald-300/40 bg-emerald-300/15 py-3 text-[14px] md:text-[15px] font-bold uppercase tracking-[0.16em] text-emerald-100 transition-all hover:bg-emerald-300/25"
                         >
                           {planCopy.freeCta}
                         </button>
                         <button
                           onClick={handleUpgrade}
-                          className="flex-1 rounded-lg border border-cyan-300/70 bg-black/45 py-3 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200 transition-all hover:border-yellow-200/70 hover:text-yellow-100"
+                          className="flex-1 rounded-lg border border-cyan-300/70 bg-black/45 py-3 text-[14px] md:text-[15px] font-bold uppercase tracking-[0.16em] text-cyan-100 transition-all hover:border-yellow-200/70 hover:text-yellow-100"
                           style={{ boxShadow: '0 0 18px rgba(34,211,238,0.4), inset 0 0 12px rgba(34,211,238,0.08)' }}
                         >
                           <span className="flex items-center justify-center gap-1">{planCopy.upgradeCta}</span>

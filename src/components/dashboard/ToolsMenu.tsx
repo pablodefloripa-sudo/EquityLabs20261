@@ -108,7 +108,7 @@ export const ToolsMenu = ({ onAfterSelect, variant = 'compact', open: openProp, 
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         window.dispatchEvent(new CustomEvent('eq:tool-result', {
-          detail: { tool: activeTool.label, model: 'gemini-2.5-flash-image', imageUrl: data.imageUrl }
+          detail: { tool: activeTool.label, model: data.model || 'image-generation', imageUrl: data.imageUrl }
         }));
       } else {
         const { data, error } = await supabase.functions.invoke('tools-ai', {

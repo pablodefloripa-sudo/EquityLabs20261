@@ -9,6 +9,7 @@ import { ArrowLeft, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useGoogleOAuth } from '@/hooks/useGoogleOAuth';
 import { buildAppUrl, buildAuthRedirectUrl } from '@/lib/auth-redirect';
+import { hasPendingGoogleOAuth } from '@/lib/oauth-state';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -23,11 +24,13 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOAuthResolving, setIsOAuthResolving] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const hasOAuthPayload = location.search.includes('code=') || location.hash.includes('access_token=');
+    const shouldResolveGoogleOAuth = hasOAuthPayload && hasPendingGoogleOAuth();
 
-    if (!hasOAuthPayload) return;
+    if (!shouldResolveGoogleOAuth) return;
 
     let active = true;
 
@@ -97,10 +100,19 @@ const Auth = () => {
         await signIn(email.trim(), password);
         navigate('/dashboard', { replace: true });
       } else {
-        await signUp(email.trim(), password);
+        const authResult = await signUp(email.trim(), password);
+
+        if (authResult.session) {
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+
+        setPendingVerificationEmail(email.trim());
+        setPassword('');
+        setMode('login');
         toast({
           title: 'Cuenta creada',
-          description: 'Revisa tu email para confirmar tu cuenta.',
+          description: 'Te enviamos un email para confirmar tu cuenta. Despues volve a iniciar sesion.',
         });
       }
     } catch (error: any) {
@@ -158,6 +170,15 @@ const Auth = () => {
               {mode === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}
             </p>
           </div>
+
+          {pendingVerificationEmail && mode === 'login' && (
+            <div className="mb-5 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-left">
+              <p className="text-sm font-semibold text-emerald-200">Cuenta creada correctamente</p>
+              <p className="mt-1 text-xs leading-relaxed text-emerald-50/80">
+                Revisa <span className="font-mono text-emerald-100">{pendingVerificationEmail}</span>, confirma tu email y luego entra desde esta pantalla.
+              </p>
+            </div>
+          )}
 
           <Button
             onClick={handleGoogleLogin}
@@ -250,7 +271,10 @@ const Auth = () => {
           <p className="text-center text-xs text-muted-foreground/60 mt-5">
             {mode === 'login' ? 'No tenes cuenta?' : 'Ya tenes cuenta?'}{' '}
             <button
-              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+              onClick={() => {
+                setPendingVerificationEmail(null);
+                setMode(mode === 'login' ? 'signup' : 'login');
+              }}
               className="text-primary hover:underline font-medium"
             >
               {mode === 'login' ? 'Registrate' : 'Inicia sesion'}

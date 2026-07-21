@@ -3,7 +3,7 @@
     {
       "id": "ag_01",
       "name": { "es": "Architect", "en": "Architect", "it": "Architetto" },
-      "engines": { "free": "StepFun 3.5 Flash", "pro": "Gemini 3 Flash Preview" },
+      "engines": { "free": "tencent/hy3:free", "pro": "tencent/hy3:free" },
       "tasks": {
         "es": ["Modelado espacial lógico", "Planos técnicos eficientes", "Simulación de estabilidad"],
         "en": ["Logical spatial modeling", "Efficient technical blueprints", "Stability simulation"],

@@ -1,14 +1,37 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Loader2, ThumbsUp, ThumbsDown, Trash2, Cpu, Plus, ShieldCheck, BarChart3 } from 'lucide-react';
+import {
+  Zap,
+  Loader2,
+  ThumbsUp,
+  ThumbsDown,
+  Trash2,
+  Cpu,
+  Plus,
+  ShieldCheck,
+  BarChart3,
+  Image as ImageIcon,
+  Layout,
+  Telescope,
+  Clapperboard,
+  Music,
+  GraduationCap,
+  Sparkles,
+  FileBarChart,
+  TrendingUp,
+  Cat,
+  X,
+} from 'lucide-react';
 import { InlineToolsPanel } from './InlineToolsPanel';
 import { AgentResponsePanel } from './AgentResponsePanel';
 import { MascotGreeting } from './MascotGreeting';
 import { MascotTaskDialog } from './MascotTaskDialog';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { VoiceWaveform } from './VoiceWaveform';
 
 import { useAIChat } from '@/hooks/useAIChat';
+import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +47,8 @@ interface Message {
   mascot?: boolean;
   agentCommand?: {
     agentName: string;
+    userName?: string;
+    selectedRole?: string;
     proposals: string[];
   };
 }
@@ -31,6 +56,19 @@ interface Message {
 interface CommunicationAreaProps {
   onEnterFocusMode: () => void;
 }
+
+type InlineToolKey =
+  | 'create_image'
+  | 'canvas_organize'
+  | 'deep_research'
+  | 'create_video_brief'
+  | 'create_music_brief'
+  | 'learn'
+  | 'prompt_engineer'
+  | 'generate_report'
+  | 'market_analysis'
+  | 'project_metrics'
+  | 'mascot';
 
 type AgentProjectForm = {
   projectName: string;
@@ -49,6 +87,64 @@ const emptyAgentProjectForm: AgentProjectForm = {
   deadline: '',
   dataSource: '',
 };
+
+const DEFAULT_ENGINE = 'tencent/hy3:free';
+const ACTIVE_AGENT_STORAGE_KEY = 'eq_active_agent_context';
+const PROJECT_ROOTS_STORAGE_KEY = 'eq_project_roots';
+const INLINE_TOOL_META: Record<InlineToolKey, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  create_image: { label: 'Crear imagen', icon: ImageIcon },
+  canvas_organize: { label: 'Canvas', icon: Layout },
+  deep_research: { label: 'Deep Research', icon: Telescope },
+  create_video_brief: { label: 'Video', icon: Clapperboard },
+  create_music_brief: { label: 'Musica', icon: Music },
+  learn: { label: 'Learn', icon: GraduationCap },
+  prompt_engineer: { label: 'Prompt Eng.', icon: Sparkles },
+  generate_report: { label: 'Reporte', icon: FileBarChart },
+  market_analysis: { label: 'Mercado', icon: TrendingUp },
+  project_metrics: { label: 'Metricas', icon: BarChart3 },
+  mascot: { label: 'Mascota IA', icon: Cat },
+};
+
+type ProjectRootRecord = {
+  id: string;
+  agentName: string;
+  userName: string;
+  selectedRole: string;
+  subscriptionPlan: string;
+  projectName: string;
+  projectTrunk: string;
+  completionWindow: string;
+  weeklyHours: string;
+  nextTask: string;
+  createdAt: string;
+};
+
+const ORCHESTRATOR_ROLE_OPTIONS = [
+  'SEO Estrategico',
+  'Full-Stack Developer',
+  'Copywriter de Conversion',
+  'Debug Mode / QA',
+  'Productividad & Neuroplasticidad',
+  'Growth & Tokenomics',
+  'Auditor de Metricas de Impacto',
+];
+
+const OPERATION_MODES = [
+  'SEO Estratégico',
+  'Full-Stack Dev',
+  'Copywriter',
+  'Debug Mode',
+  'Creatividad',
+  'Precisión Quirúrgica',
+] as const;
+
+const STYLE_MODES = [
+  'Equilibrado',
+  'Lluvia de Ideas',
+  'Concisión Extrema',
+  'Explicación Humana',
+  'Formato Markdown',
+] as const;
 
 const metricFields: Array<{
   key: keyof AgentProjectForm;
@@ -89,16 +185,11 @@ const StatusLEDs = ({ isThinking }: { isThinking: boolean }) => (
   </div>
 );
 
-const buildAgentCommand = (agentName: string, tasks: string[], engine: string) => {
+const buildAgentCommand = (agentName: string, tasks: string[], engine: string, userName: string) => {
   const safeTasks = tasks.length ? tasks : ['Buscar norte estrategico', 'Implementar agentes necesarios', 'Auditar rendimiento y permisos'];
-  const proposals = [
-    `Buscar norte: diagnosticar objetivo, restricciones, oportunidad y primer indicador de exito para ${agentName}.`,
-    `Implementar squad: activar ${agentName} como agente lider y sumar agentes de soporte segun proyecto, permisos y riesgo.`,
-    `Control operativo: abrir proyecto con metricas de rendimiento, auditoria, permisos del usuario y checkpoints de avance.`,
-  ];
+  const proposals = safeTasks.slice(0, 3);
 
   return {
-    proposals,
     prompt: [
       `Ejecucion inmediata con ${agentName}.`,
       `Motor inicial: ${engine}.`,
@@ -112,17 +203,143 @@ const buildAgentCommand = (agentName: string, tasks: string[], engine: string) =
     content: [
       `**${agentName} listo para operar.**`,
       '',
-      'Ya entiendo que este agente fue elegido como punto de entrada. No voy a pedir Gmail, Drive, Calendar o Sheets hasta que una accion concreta lo necesite.',
+      `Hola ${userName}. Ya entendí que este agente fue elegido como punto de entrada.`,
       '',
-      '**Tres propuestas de trabajo inmediato:**',
+      'Antes de ejecutar, vamos a abrir el documento raiz del proyecto y dejar registrada la proxima tarea.',
       '',
-      `1. ${proposals[0]}`,
-      `2. ${proposals[1]}`,
-      `3. ${proposals[2]}`,
-      '',
-      '**Arquitectura de ejecucion:** norte estrategico, agentes necesarios, proyecto abierto, metricas, auditoria, control y permisos bajo demanda.',
+      'Completá este kickoff rapido: rol operativo, tronco, tiempo disponible, horas semanales y siguiente micro-accion.',
     ].join('\n'),
+    proposals,
   };
+};
+
+const getOperatorName = (user: ReturnType<typeof useAuth>['user']) => {
+  const meta = user?.user_metadata as Record<string, unknown> | undefined;
+  if (typeof meta?.full_name === 'string' && meta.full_name.trim()) return meta.full_name;
+  if (typeof meta?.name === 'string' && meta.name.trim()) return meta.name;
+  if (typeof user?.email === 'string' && user.email.trim()) return user.email.split('@')[0];
+  return 'Operador';
+};
+
+const KickoffDialogCard = ({
+  agentName,
+  userName,
+  selectedRole,
+  subscriptionPlan,
+  onSave,
+}: {
+  agentName: string;
+  userName: string;
+  selectedRole: string;
+  subscriptionPlan: string;
+  onSave: (record: ProjectRootRecord) => void;
+}) => {
+  const [projectName, setProjectName] = useState('');
+  const [projectTrunk, setProjectTrunk] = useState('');
+  const [completionWindow, setCompletionWindow] = useState('');
+  const [weeklyHours, setWeeklyHours] = useState('');
+  const [nextTask, setNextTask] = useState('');
+  const [role, setRole] = useState(selectedRole);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (!projectName.trim() || !projectTrunk.trim()) return;
+
+    onSave({
+      id: crypto.randomUUID(),
+      agentName,
+      userName,
+      selectedRole: role,
+      subscriptionPlan,
+      projectName: projectName.trim(),
+      projectTrunk: projectTrunk.trim(),
+      completionWindow: completionWindow.trim(),
+      weeklyHours: weeklyHours.trim(),
+      nextTask: nextTask.trim(),
+      createdAt: new Date().toISOString(),
+    });
+    setSaved(true);
+  };
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-3xl border border-cyan-300/22 bg-black/55 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.38)] backdrop-blur-xl">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-300/70">Documento raiz del proyecto</p>
+          <h3 className="mt-1 text-base font-semibold text-cyan-50">{userName}, definamos el tronco y la proxima tarea</h3>
+        </div>
+        <div className="rounded-full border border-emerald-300/18 bg-emerald-300/8 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.14em] text-emerald-100/75">
+          {subscriptionPlan}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-cyan-300/14 bg-cyan-300/6 px-3 py-2">
+          <span className="block text-[10px] font-mono uppercase tracking-[0.16em] text-cyan-200/70">Agente seleccionado</span>
+          <strong className="mt-1 block text-sm text-cyan-50">{agentName}</strong>
+        </div>
+        <div className="rounded-2xl border border-violet-300/14 bg-violet-300/6 px-3 py-2">
+          <span className="block text-[10px] font-mono uppercase tracking-[0.16em] text-violet-200/70">Rol operativo</span>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {ORCHESTRATOR_ROLE_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setRole(option)}
+                className={`rounded-full border px-3 py-1.5 text-[11px] transition ${
+                  role === option
+                    ? 'border-cyan-300/60 bg-cyan-300/14 text-cyan-50'
+                    : 'border-white/10 bg-white/5 text-slate-300/75 hover:border-cyan-300/30'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="rounded-2xl border border-white/10 bg-black/18 px-3 py-2">
+          <span className="mb-1 block text-[10px] font-mono uppercase tracking-[0.16em] text-slate-300/70">Proyecto</span>
+          <input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Ej. Job Booster Sprint" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
+        </label>
+        <label className="rounded-2xl border border-white/10 bg-black/18 px-3 py-2">
+          <span className="mb-1 block text-[10px] font-mono uppercase tracking-[0.16em] text-slate-300/70">Tiempo disponible</span>
+          <input value={completionWindow} onChange={(e) => setCompletionWindow(e.target.value)} placeholder="Ej. 30 dias / 12 semanas" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
+        </label>
+        <label className="rounded-2xl border border-white/10 bg-black/18 px-3 py-2">
+          <span className="mb-1 block text-[10px] font-mono uppercase tracking-[0.16em] text-slate-300/70">Horas semanales</span>
+          <input value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} placeholder="Ej. 10h / 20h" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
+        </label>
+        <label className="rounded-2xl border border-white/10 bg-black/18 px-3 py-2">
+          <span className="mb-1 block text-[10px] font-mono uppercase tracking-[0.16em] text-slate-300/70">Proxima micro-tarea</span>
+          <input value={nextTask} onChange={(e) => setNextTask(e.target.value)} placeholder="Ej. mapear keyword clusters" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500" />
+        </label>
+      </div>
+
+      <div className="mt-3">
+        <Textarea
+          value={projectTrunk}
+          onChange={(e) => setProjectTrunk(e.target.value)}
+          placeholder="Defini el tronco del proyecto: problema real, impacto, restriccion y resultado esperado."
+          className="min-h-[110px] border-white/10 bg-black/18 text-sm text-white placeholder:text-slate-500 focus-visible:ring-cyan-500"
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[11px] text-slate-400">Esto queda guardado para volver a buscarlo en el futuro.</p>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={saved || !projectName.trim() || !projectTrunk.trim()}
+          className="rounded-xl bg-cyan-600 px-4 text-sm text-white hover:bg-cyan-500"
+        >
+          {saved ? 'Guardado' : 'Guardar documento raiz'}
+        </Button>
+      </div>
+    </div>
+  );
 };
 
 export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) => {
@@ -132,12 +349,23 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   const [mascotTask, setMascotTask] = useState<string | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [responseScale, setResponseScale] = useState(1);
+  const [selectedInlineTool, setSelectedInlineTool] = useState<{ key: InlineToolKey; label: string } | null>(null);
   const [activeAgentName, setActiveAgentName] = useState<string | null>(null);
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
+  const [activeAgentEngine, setActiveAgentEngine] = useState<string>(DEFAULT_ENGINE);
   const [agentProjectForm, setAgentProjectForm] = useState<AgentProjectForm>(emptyAgentProjectForm);
+  const [operationMode, setOperationMode] = useState<(typeof OPERATION_MODES)[number]>('SEO Estratégico');
+  const [styleMode, setStyleMode] = useState<(typeof STYLE_MODES)[number]>('Explicación Humana');
+  const [missionToday, setMissionToday] = useState('');
+  const [timeLimitEnabled, setTimeLimitEnabled] = useState(false);
+  const [timeLimitDate, setTimeLimitDate] = useState('');
+  const [fundsAvailable, setFundsAvailable] = useState<'si' | 'no'>('si');
+  const [winnerPrompts, setWinnerPrompts] = useState<Array<{ id: string; title: string; prompt: string; savedAt: string }>>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const { sendMessage, isLoading: aiLoading } = useAIChat();
   const getWaveformState = (): 'idle' | 'thinking' | 'speaking' => {
@@ -171,6 +399,20 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem('eq_winner_prompts');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setWinnerPrompts(parsed);
+        }
+      }
+    } catch {
+      // ignore malformed local cache
+    }
+  }, []);
+
+  useEffect(() => {
     const handleAgentSelected = (event: Event) => {
       const detail = (event as CustomEvent<{
         id?: string;
@@ -179,16 +421,25 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
         engine?: string;
       }>).detail || {};
       const agentName = detail.name || 'Agente';
-      const command = buildAgentCommand(agentName, detail.tasks || [], detail.engine || 'FREE');
+      const engine = detail.engine || DEFAULT_ENGINE;
+      const operatorName = getOperatorName(user);
+      const command = buildAgentCommand(agentName, detail.tasks || [], engine, operatorName);
       const subscriptionRaw = localStorage.getItem('eq_subscription_context');
       const subscription = subscriptionRaw ? JSON.parse(subscriptionRaw) : null;
+      localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, JSON.stringify({
+        id: detail.id,
+        name: agentName,
+        engine,
+        tasks: detail.tasks || [],
+        selectedAt: new Date().toISOString(),
+      }));
       (window as unknown as {
         __eqDashboardContext?: unknown;
       }).__eqDashboardContext = {
         activeAgent: {
           id: detail.id,
           name: agentName,
-          engine: detail.engine || 'FREE',
+          engine,
           tasks: detail.tasks || [],
         },
         subscription,
@@ -200,21 +451,69 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
         role: 'assistant',
         content: command.content,
         timestamp: new Date(),
-        model: detail.engine || 'agent-router',
+        model: engine,
         agentCommand: {
           agentName,
+          userName: operatorName,
           proposals: command.proposals,
         },
       }]);
       setInputValue('');
       setActiveAgentName(agentName);
+      setActiveAgentId(detail.id || null);
+      setActiveAgentEngine(engine);
       setAgentProjectForm(emptyAgentProjectForm);
       setToolsOpen(false);
+      forceFocus();
     };
 
     window.addEventListener('eq:agent-selected', handleAgentSelected);
     return () => window.removeEventListener('eq:agent-selected', handleAgentSelected);
-  }, [forceFocus]);
+  }, [forceFocus, user]);
+
+  useEffect(() => {
+    if (messages.length > 0) return;
+
+    try {
+      const rawActiveAgent = localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY);
+      if (!rawActiveAgent) return;
+
+      const activeAgent = JSON.parse(rawActiveAgent) as {
+        id?: string;
+        name?: string;
+        engine?: string;
+        tasks?: string[];
+      };
+
+      if (!activeAgent.name) return;
+
+      const operatorName = getOperatorName(user);
+      const command = buildAgentCommand(
+        activeAgent.name,
+        activeAgent.tasks || [],
+        activeAgent.engine || DEFAULT_ENGINE,
+        operatorName,
+      );
+
+      setMessages([{
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: command.content,
+        timestamp: new Date(),
+        model: activeAgent.engine || DEFAULT_ENGINE,
+        agentCommand: {
+          agentName: activeAgent.name,
+          userName: operatorName,
+          proposals: command.proposals,
+        },
+      }]);
+      setActiveAgentName(activeAgent.name);
+      setActiveAgentId(activeAgent.id || null);
+      setActiveAgentEngine(activeAgent.engine || DEFAULT_ENGINE);
+    } catch {
+      // ignore malformed active agent cache
+    }
+  }, [messages.length, user]);
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -306,6 +605,30 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   }, [forceFocus]);
 
   useEffect(() => {
+    const handleInlineToolSelected = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: InlineToolKey; label?: string }>).detail || {};
+      if (!detail.key || !INLINE_TOOL_META[detail.key]) return;
+      setSelectedInlineTool({
+        key: detail.key,
+        label: detail.label || INLINE_TOOL_META[detail.key].label,
+      });
+      forceFocus();
+    };
+
+    const handleInlineToolCleared = () => {
+      setSelectedInlineTool(null);
+      forceFocus();
+    };
+
+    window.addEventListener('eq:inline-tool-selected', handleInlineToolSelected);
+    window.addEventListener('eq:inline-tool-cleared', handleInlineToolCleared);
+    return () => {
+      window.removeEventListener('eq:inline-tool-selected', handleInlineToolSelected);
+      window.removeEventListener('eq:inline-tool-cleared', handleInlineToolCleared);
+    };
+  }, [forceFocus]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     // Publish current messages so ExitModal can snapshot the full session
     (window as unknown as { __eqMessages?: Message[] }).__eqMessages = messages;
@@ -324,6 +647,20 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
   const handleSend = async () => {
     if (!inputValue.trim() || aiLoading) return;
 
+    if (selectedInlineTool) {
+      const currentInput = inputValue.trim();
+      setInputValue('');
+      forceFocus();
+      window.dispatchEvent(new CustomEvent('eq:run-selected-tool', {
+        detail: {
+          prompt: currentInput,
+          preferredModel: activeAgentEngine || DEFAULT_ENGINE,
+          agentId: activeAgentId || undefined,
+        },
+      }));
+      return;
+    }
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -338,13 +675,18 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
 
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
-      const response = await sendMessage(currentInput, history);
+      const result = await sendMessage(currentInput, history, activeAgentId || undefined);
       
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response,
+        content: result.response,
         timestamp: new Date(),
+        model: typeof result.meta?.effectiveModel === 'string'
+          ? result.meta.effectiveModel
+          : typeof result.meta?.model === 'string'
+            ? result.meta.model
+            : undefined,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -379,9 +721,23 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
     const filled = metricFields
       .map(field => `${field.label}: ${agentProjectForm[field.key].trim() || 'Pendiente'}`)
       .join('\n');
+    const instructionOne = [
+      `Modo de Operacion: ${operationMode}.`,
+      `Estilo de respuesta: ${styleMode}.`,
+      `Mision de hoy: ${missionToday.trim() || 'Pendiente'}.`,
+      `Time limit: ${timeLimitEnabled ? (timeLimitDate || 'Definido por el usuario') : 'Sin limite'}.`,
+      `Fondos disponibles: ${fundsAvailable === 'si' ? 'Si' : 'No'}.`,
+    ].join('\n');
     const currentAgentName = activeAgentName;
+    const currentAgentId = activeAgentId;
     const currentInput = [
       `Activar ${currentAgentName} con este proyecto y llevar metricas operativas.`,
+      `Motor configurado: ${activeAgentEngine || DEFAULT_ENGINE}.`,
+      '',
+      'Instruccion 1:',
+      instructionOne,
+      '',
+      'Instruccion 2:',
       filled,
       '',
       'Devolve checkpoints, riesgos, permisos necesarios y primera accion medible.',
@@ -403,13 +759,17 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
 
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
-      const response = await sendMessage(currentInput, history);
+      const result = await sendMessage(currentInput, history, currentAgentId || undefined);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response,
+        content: result.response,
         timestamp: new Date(),
-        model: currentAgentName,
+        model: typeof result.meta?.effectiveModel === 'string'
+          ? result.meta.effectiveModel
+          : typeof result.meta?.model === 'string'
+            ? result.meta.model
+            : currentAgentName,
       }]);
     } catch (error) {
       console.error('Error sending agent metrics:', error);
@@ -428,6 +788,30 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
     } finally {
       forceFocus();
     }
+  };
+
+  const saveWinnerPrompt = () => {
+    const prompt = [
+      `Modo: ${operationMode}`,
+      `Estilo: ${styleMode}`,
+      `Mision: ${missionToday.trim() || 'Pendiente'}`,
+      `Time limit: ${timeLimitEnabled ? (timeLimitDate || 'Definido por el usuario') : 'Sin limite'}`,
+      `Fondos: ${fundsAvailable === 'si' ? 'Si' : 'No'}`,
+    ].join(' | ');
+
+    const nextEntry = {
+      id: crypto.randomUUID(),
+      title: `${operationMode} · ${styleMode}`,
+      prompt,
+      savedAt: new Date().toISOString(),
+    };
+
+    setWinnerPrompts(prev => {
+      const next = [nextEntry, ...prev].slice(0, 6);
+      localStorage.setItem('eq_winner_prompts', JSON.stringify(next));
+      return next;
+    });
+    toast({ title: 'Prompt ganador guardado', description: operationMode });
   };
 
   const requestIntegration = (provider: string, reason: string) => {
@@ -455,25 +839,34 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
     }
   };
 
+  const selectedInlineToolMeta = selectedInlineTool ? INLINE_TOOL_META[selectedInlineTool.key] : null;
+  const SelectedInlineToolIcon = selectedInlineToolMeta?.icon;
+
   return (
-    <div className="flex flex-col flex-1 justify-end min-h-0 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="relative mx-auto h-full w-full max-w-7xl px-4 sm:px-6 lg:px-8">
       {/* Waveform */}
       <div className="absolute top-1 left-1/2 -translate-x-1/2 w-48 z-10">
         <VoiceWaveform state={getWaveformState()} />
       </div>
 
       {/* Messages */}
-      <div className="flex flex-col flex-1 justify-end px-1 pb-0 min-h-0">
+      <div
+        className="absolute inset-x-0 top-0 overflow-hidden px-1"
+        style={{
+          bottom: 'calc(var(--dashboard-console-height) + var(--dashboard-console-gap) + 18px)',
+        }}
+      >
+        <div className="flex h-full flex-col justify-end min-h-0">
         {messages.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-2"
+            className="mb-6 text-center"
           >
-            <p className="text-muted-foreground/40 text-xs font-mono tracking-widest">{t('chat.start')}</p>
+            <p className="text-muted-foreground/40 text-xs font-mono tracking-widest">Meta-Learning focus mode</p>
           </motion.div>
         ) : (
-          <div className="flex-1 overflow-y-auto scrollbar-thin mb-1 max-h-[72vh]">
+          <div className="flex-1 overflow-y-auto scrollbar-thin pb-6">
             <div className="mx-auto w-full max-w-4xl space-y-3">
               {messages.map((msg, index) => (
                 <motion.div
@@ -504,7 +897,7 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
                             <div className="mt-2 rounded-2xl border border-cyan-400/20 bg-black/45 p-3 backdrop-blur-xl">
                               <div className="mb-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-300/75">
                                 <ShieldCheck className="h-3.5 w-3.5" />
-                                Permisos bajo demanda
+                                Opciones de arranque
                               </div>
                               <div className="grid gap-2 md:grid-cols-3">
                                 {msg.agentCommand.proposals.map((proposal, proposalIndex) => (
@@ -565,8 +958,26 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
                       )}
                     </div>
                   ) : (
-                    <div className="max-w-[80%] p-4 rounded-2xl text-sm bg-primary/20 text-foreground/90 border border-primary/30">
-                      {msg.content}
+                    <div className="relative max-w-[80%] overflow-hidden rounded-[22px] border border-cyan-300/30 bg-[linear-gradient(180deg,rgba(7,18,34,0.90)_0%,rgba(3,7,14,0.92)_100%)] px-4 py-4 text-sm text-cyan-50/90 backdrop-blur-2xl shadow-[0_0_32px_rgba(34,211,238,0.12),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.08)]">
+                      <div
+                        className="pointer-events-none absolute inset-0 opacity-[0.08]"
+                        style={{
+                          backgroundImage:
+                            'radial-gradient(circle at 20% 0%, rgba(34,211,238,0.14), transparent 28%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.08), transparent 24%), linear-gradient(135deg, rgba(255,255,255,0.05), transparent 28%, rgba(34,211,238,0.05))',
+                        }}
+                      />
+                      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-200/90 to-transparent" />
+                      <div className="relative z-10 mb-3 flex items-center gap-2 font-mono text-[10px] text-cyan-200/55">
+                        <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5">you</span>
+                        <span>equitylabs://user-input</span>
+                      </div>
+                      <div className="relative z-10 font-mono text-[clamp(12px,calc(13px*var(--response-scale)),20px)] leading-relaxed">
+                        {msg.content}
+                      </div>
+                      <div className="absolute top-0 left-0 h-3 w-3 rounded-tl-[22px] border-l border-t border-cyan-400/45" />
+                      <div className="absolute top-0 right-0 h-3 w-3 rounded-tr-[22px] border-r border-t border-cyan-400/35" />
+                      <div className="absolute bottom-0 left-0 h-3 w-3 rounded-bl-[22px] border-b border-l border-cyan-400/35" />
+                      <div className="absolute bottom-0 right-0 h-3 w-3 rounded-br-[22px] border-b border-r border-cyan-400/45" />
                     </div>
                   )}
                 </motion.div>
@@ -575,12 +986,18 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
             </div>
           </div>
         )}
+        </div>
       </div>
 
-      {/* Command Console - flush to bottom with 0.5rem margin */}
-      <div className="relative w-full pb-2">
+      {/* Command Console */}
+      <div
+        className="absolute inset-x-0 z-20"
+        style={{
+          bottom: 'var(--dashboard-console-gap)',
+        }}
+      >
         <InlineToolsPanel open={toolsOpen} onClose={() => setToolsOpen(false)} />
-        {activeAgentName ? (
+        {false && activeAgentName ? (
           <motion.div
             key={activeAgentName}
             initial={{ opacity: 0, y: 34, scale: 0.96 }}
@@ -594,16 +1011,202 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
             <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-200/90 to-transparent" />
             <div className="relative border-b border-cyan-300/18 px-4 py-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-300/35 bg-cyan-300/12 text-cyan-200">
-                  <BarChart3 className="h-4 w-4" />
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-emerald-300/35 bg-black/50">
+                  <div className="flex h-full w-full items-center justify-center bg-black/80 text-[9px] font-mono uppercase tracking-[0.18em] text-emerald-200/70">
+                    HY3
+                  </div>
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h2 className="truncate font-display text-lg font-semibold tracking-wide text-cyan-50">
                     {activeAgentName}
                   </h2>
                   <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/60">
-                    Formulario de metricas
+                    Formulario tecnico interno
                   </p>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1">
+                  <Cpu className="h-3.5 w-3.5 text-emerald-300" />
+                  <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-emerald-100/70">
+                    {activeAgentEngine || DEFAULT_ENGINE}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-[0.92fr_1.08fr]">
+                <div className="rounded-2xl border border-emerald-300/16 bg-emerald-300/6 p-3">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-emerald-200/70">
+                    Motor configurado
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-50">
+                    {activeAgentEngine || DEFAULT_ENGINE}
+                  </p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-emerald-100/55">
+                    Razonamiento multi-paso, orquestacion de agentes y ejecucion de largo recorrido.
+                    Pensado para panel interno, trazabilidad y proyectos operativos.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-300/16 bg-black/25 px-2.5 py-1 text-[10px] text-emerald-100/70">
+                      1M context
+                    </span>
+                    <span className="rounded-full border border-emerald-300/16 bg-black/25 px-2.5 py-1 text-[10px] text-emerald-100/70">
+                      MoE
+                    </span>
+                    <span className="rounded-full border border-emerald-300/16 bg-black/25 px-2.5 py-1 text-[10px] text-emerald-100/70">
+                      Agentic workflows
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-cyan-300/15 bg-black/28 p-3">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-200/60">
+                    Perfil tecnico
+                  </p>
+                  <div className="mt-2 grid gap-2 text-[11px] text-cyan-50/72">
+                    <p>• Modelo base para el proyecto nuevo: <span className="text-cyan-200">{activeAgentEngine || DEFAULT_ENGINE}</span></p>
+                    <p>• Salida pensada para panel interno y trazabilidad operativa.</p>
+                    <p>• Debe mantener respuestas directas y resumen ejecutivo.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-b border-cyan-300/12 px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-200/60">Modo de Operación</p>
+                  <h3 className="mt-1 text-sm font-semibold text-cyan-50">Instrucción 1 del nuevo proyecto</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTimeLimitEnabled((value) => !value)}
+                  className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-emerald-100/80 transition hover:bg-emerald-300/15"
+                >
+                  Time Limit
+                </button>
+              </div>
+
+              <div className="mt-3 grid gap-3">
+                <div>
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/55">
+                    Modos
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {OPERATION_MODES.map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setOperationMode(mode)}
+                        className={`group relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-medium tracking-[0.08em] transition-all duration-200 ${
+                          operationMode === mode
+                            ? 'border-cyan-300/55 bg-gradient-to-r from-cyan-300/20 to-emerald-300/14 text-cyan-50 shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_10px_24px_rgba(34,211,238,0.08)]'
+                            : 'border-white/10 bg-white/5 text-cyan-50/72 hover:border-cyan-300/28 hover:bg-cyan-300/10 hover:text-cyan-50'
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full transition-all ${
+                            operationMode === mode ? 'bg-cyan-200 shadow-[0_0_10px_rgba(165,243,252,0.65)]' : 'bg-white/20 group-hover:bg-cyan-200/60'
+                          }`}
+                        />
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/55">
+                    Formato y tono
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {STYLE_MODES.map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => setStyleMode(style)}
+                        className={`group relative inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-medium tracking-[0.08em] transition-all duration-200 ${
+                          styleMode === style
+                            ? 'border-emerald-300/55 bg-gradient-to-r from-emerald-300/18 to-teal-300/14 text-emerald-50 shadow-[0_0_0_1px_rgba(110,231,183,0.10),0_10px_24px_rgba(16,185,129,0.08)]'
+                            : 'border-white/10 bg-white/5 text-emerald-50/72 hover:border-emerald-300/28 hover:bg-emerald-300/10 hover:text-emerald-50'
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full transition-all ${
+                            styleMode === style ? 'bg-emerald-200 shadow-[0_0_10px_rgba(167,243,208,0.65)]' : 'bg-white/20 group-hover:bg-emerald-200/60'
+                          }`}
+                        />
+                        {style}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+                  <label className="rounded-xl border border-cyan-300/16 bg-cyan-300/7 px-3 py-2">
+                    <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-200/70">
+                      Escribe la misión de hoy...
+                    </span>
+                    <Textarea
+                      value={missionToday}
+                      onChange={(event) => setMissionToday(event.target.value)}
+                      placeholder="Escribe la misión de hoy..."
+                      className="min-h-[100px] border-0 bg-transparent p-0 text-sm text-cyan-50 placeholder:text-cyan-100/24 focus-visible:ring-0"
+                    />
+                  </label>
+
+                  <div className="space-y-3 rounded-xl border border-emerald-300/16 bg-emerald-300/6 p-3">
+                    <div>
+                      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-200/70">
+                        Fondos disponibilidad
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['si', 'no'] as const).map((choice) => (
+                          <button
+                            key={choice}
+                            type="button"
+                            onClick={() => setFundsAvailable(choice)}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                              fundsAvailable === choice
+                                ? 'border-emerald-300/50 bg-emerald-300/15 text-emerald-50'
+                                : 'border-white/10 bg-black/20 text-emerald-100/60 hover:border-emerald-300/20 hover:bg-emerald-300/10'
+                            }`}
+                          >
+                            {choice === 'si' ? 'Si' : 'No'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {timeLimitEnabled && (
+                      <label className="block rounded-xl border border-emerald-300/16 bg-black/20 px-3 py-2">
+                        <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-200/70">
+                          Seleccionar fecha
+                        </span>
+                        <input
+                          type="date"
+                          value={timeLimitDate}
+                          onChange={(event) => setTimeLimitDate(event.target.value)}
+                          className="w-full bg-transparent text-sm text-emerald-50 outline-none"
+                        />
+                      </label>
+                    )}
+
+                    {!timeLimitEnabled && (
+                      <p className="text-xs leading-relaxed text-emerald-100/50">
+                        Presioná <span className="text-emerald-200">Time Limit</span> para abrir el selector de fecha.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={saveWinnerPrompt}
+                    className="rounded-full border border-fuchsia-300/25 bg-fuchsia-400/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-fuchsia-50 transition hover:bg-fuchsia-400/15"
+                  >
+                    Guardar Prompt Ganador
+                  </button>
+                  <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-200/40">
+                    Todo esto se envía como instrucción 1 del proyecto
+                  </span>
                 </div>
               </div>
             </div>
@@ -628,6 +1231,35 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
                   />
                 </motion.label>
               ))}
+            </div>
+
+            <div className="px-3 pb-3">
+              <div className="rounded-2xl border border-cyan-300/14 bg-black/28 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-200/55">Prompts Ganadores</p>
+                    <h4 className="mt-1 text-sm font-semibold text-cyan-50">Historial guardado</h4>
+                  </div>
+                  <span className="rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-mono text-cyan-100/70">
+                    {winnerPrompts.length}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {winnerPrompts.length > 0 ? (
+                    winnerPrompts.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-cyan-300/12 bg-white/5 px-3 py-2">
+                        <p className="text-xs font-semibold text-cyan-50">{item.title}</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-cyan-50/60">{item.prompt}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="py-4 text-center text-xs text-cyan-50/45">
+                      Sin prompts guardados aún.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-2 border-t border-cyan-300/14 px-3 py-2">
@@ -657,28 +1289,33 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               : '0 0 32px rgba(34,211,238,0.30), 0 0 16px rgba(6,182,212,0.25) inset, 0 14px 28px rgba(0,0,0,0.55)',
           }}
           transition={{ duration: 0.25 }}
-          className="relative mx-auto flex w-full max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl border border-cyan-300/60"
+          className="relative mx-auto flex w-full max-w-[min(95vw,1360px)] flex-col gap-0 overflow-visible rounded-[28px]"
           style={{
-            background: 'linear-gradient(160deg, rgba(8,145,178,0.18) 0%, rgba(6,182,212,0.10) 40%, rgba(0,0,0,0.55) 100%)',
-            backdropFilter: 'blur(28px) saturate(160%)',
-            WebkitBackdropFilter: 'blur(28px) saturate(160%)',
+            background: 'transparent',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
           }}
         >
-          {/* 3D top highlight */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-200/90 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-cyan-200/15 to-transparent" />
-          {/* 3D bottom shadow */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" />
-          {/* Glow ring */}
-          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-cyan-400/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-cyan-200/8 via-fuchsia-200/4 to-transparent" />
 
           {/* Status LEDs */}
-          <div className="relative px-3 pt-3 pb-2">
-            <StatusLEDs isThinking={aiLoading} />
+          <div className="relative px-2 pt-1 pb-1">
+            <div
+              className="inline-flex items-center rounded-[16px] border border-slate-200/26 px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(0,0,0,0.18)]"
+              style={{
+                background:
+                  'linear-gradient(180deg, rgba(196,201,208,0.30) 0%, rgba(128,136,148,0.20) 48%, rgba(64,72,84,0.16) 100%)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+              }}
+            >
+              <StatusLEDs isThinking={aiLoading} />
+            </div>
           </div>
 
-          {/* Textarea row — vivid cyan-tinted black */}
-          <div className="relative mx-2 my-1 rounded-2xl px-4 py-4 sm:px-5" style={{ background: 'linear-gradient(180deg, rgba(0,20,30,0.92) 0%, rgba(0,12,20,0.95) 100%)', boxShadow: 'inset 0 1px 0 rgba(34,211,238,0.35), inset 0 -1px 0 rgba(0,0,0,0.6)' }}>
+          {/* Textarea row */}
+          <div className="eq-spectrum-box relative mx-0 my-0 rounded-[24px] border border-white/20 px-4 py-2 sm:px-5" style={{ background: 'rgba(0, 0, 0, 0.89)', boxShadow: '0 14px 24px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+            <div className="pointer-events-none absolute inset-[3px] rounded-[21px] border border-slate-200/26 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]" />
 
             <textarea
               ref={textareaRef}
@@ -692,19 +1329,27 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               autoFocus
               rows={1}
               className="w-full bg-transparent border-none outline-none resize-none text-foreground/95 text-xl font-display placeholder:text-muted-foreground/30 leading-relaxed scrollbar-thin caret-primary overflow-y-auto text-center sm:text-left"
-              style={{ minHeight: '36px', maxHeight: '184px', caretColor: 'hsl(var(--primary))', fontSize: '20px' }}
+              style={{ minHeight: '24px', maxHeight: '120px', caretColor: 'hsl(var(--primary))', fontSize: '18px' }}
             />
           </div>
 
           {/* Toolbar */}
-          <div className="relative flex items-center justify-between px-3 py-2" style={{ background: 'linear-gradient(180deg, rgba(8,145,178,0.12) 0%, rgba(0,0,0,0.55) 100%)', boxShadow: 'inset 0 1px 0 rgba(34,211,238,0.25)' }}>
-            <div className="flex items-center gap-2">
+          <div className="relative flex items-center justify-between px-3 py-1.5">
+            <div
+              className="inline-flex items-center gap-2 rounded-[16px] border border-slate-200/26 px-2.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_18px_rgba(0,0,0,0.18)]"
+              style={{
+                background:
+                  'linear-gradient(180deg, rgba(196,201,208,0.30) 0%, rgba(128,136,148,0.20) 48%, rgba(64,72,84,0.16) 100%)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+              }}
+            >
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setToolsOpen(v => !v)}
                 title="Centro de Herramientas"
-                className={`h-8 w-8 rounded-xl transition-all duration-300 border ${
+                className={`h-7 w-7 rounded-xl transition-all duration-300 border ${
                   toolsOpen
                     ? 'text-cyan-200 bg-cyan-400/20 border-cyan-400/60 shadow-[0_0_12px_rgba(34,211,238,0.45)]'
                     : 'text-cyan-300/80 bg-cyan-400/5 border-cyan-400/30 hover:bg-cyan-400/15 hover:text-cyan-200'
@@ -712,6 +1357,24 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               >
                 <Plus className="w-4 h-4" />
               </Button>
+
+              {SelectedInlineToolIcon && selectedInlineTool && (
+                <div className="inline-flex items-center gap-1 rounded-xl border border-cyan-300/28 bg-black/18 px-2 py-1 text-cyan-100/88 shadow-[0_0_10px_rgba(34,211,238,0.12)]">
+                  <SelectedInlineToolIcon className="h-3.5 w-3.5" />
+                  <span className="max-w-[110px] truncate text-[10px] font-mono uppercase tracking-[0.14em]">
+                    {selectedInlineTool.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent('eq:inline-tool-clear-request'))}
+                    className="rounded-md p-0.5 text-cyan-100/58 transition hover:bg-cyan-300/12 hover:text-cyan-50"
+                    title="Quitar herramienta"
+                    aria-label="Quitar herramienta"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <Button
@@ -719,7 +1382,7 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
               size="icon"
               onClick={handleSend}
               disabled={!inputValue.trim() || aiLoading}
-              className="h-10 w-10 rounded-xl bg-primary/20 text-primary hover:bg-primary/30 hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] disabled:opacity-30 transition-all duration-300"
+              className="h-8 w-8 rounded-xl bg-primary/20 text-primary hover:bg-primary/30 hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] disabled:opacity-30 transition-all duration-300"
             >
               {aiLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -755,8 +1418,18 @@ export const CommunicationArea = ({ onEnterFocusMode }: CommunicationAreaProps) 
           forceFocus();
           try {
             const history = messages.map(m => ({ role: m.role, content: m.content }));
-            const response = await sendMessage(task, history);
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: response, timestamp: new Date() }]);
+            const result = await sendMessage(task, history, activeAgentId || undefined);
+            setMessages(prev => [...prev, {
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content: result.response,
+              timestamp: new Date(),
+              model: typeof result.meta?.effectiveModel === 'string'
+                ? result.meta.effectiveModel
+                : typeof result.meta?.model === 'string'
+                  ? result.meta.model
+                  : undefined,
+            }]);
           } catch (e) {
             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: t('chat.error'), timestamp: new Date() }]);
           }

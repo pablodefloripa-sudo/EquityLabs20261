@@ -7,11 +7,47 @@ interface Message {
   content: string;
 }
 
+interface AIChatResult {
+  response: string;
+  meta?: Record<string, unknown> | null;
+}
+
 interface UseAIChatReturn {
-  sendMessage: (message: string, conversationHistory?: Message[]) => Promise<string>;
+  sendMessage: (message: string, conversationHistory?: Message[], agentId?: string) => Promise<AIChatResult>;
   isLoading: boolean;
   error: string | null;
 }
+
+const RUNTIME_ERROR_LOG_KEY = 'eq_runtime_error_log';
+const RUNTIME_HEALTH_KEY = 'eq_runtime_health_v1';
+
+const appendRuntimeError = (source: string, message: string) => {
+  try {
+    const raw = localStorage.getItem(RUNTIME_ERROR_LOG_KEY);
+    const current = raw ? JSON.parse(raw) : [];
+    const next = Array.isArray(current) ? current : [];
+    next.unshift({
+      id: crypto.randomUUID(),
+      source,
+      message,
+      timestamp: new Date().toISOString(),
+    });
+    localStorage.setItem(RUNTIME_ERROR_LOG_KEY, JSON.stringify(next.slice(0, 15)));
+  } catch {
+    // ignore logger storage failures
+  }
+};
+
+const markRuntimeHealth = (payload: Record<string, unknown>) => {
+  try {
+    localStorage.setItem(RUNTIME_HEALTH_KEY, JSON.stringify({
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch {
+    // ignore logger storage failures
+  }
+};
 
 const isSimpleGreeting = (message: string) =>
   /^(hola|hello|hi|hey|buenos dias|buenas tardes|buenas noches|saludos)$/i.test(
@@ -35,8 +71,9 @@ export const useAIChat = (): UseAIChatReturn => {
 
   const sendMessage = useCallback(async (
     message: string, 
-    conversationHistory: Message[] = []
-  ): Promise<string> => {
+    conversationHistory: Message[] = [],
+    agentId?: string,
+  ): Promise<AIChatResult> => {
     setIsLoading(true);
     setError(null);
 
@@ -44,6 +81,7 @@ export const useAIChat = (): UseAIChatReturn => {
       const { data, error: fnError } = await supabase.functions.invoke('ai-chat', {
         body: { 
           message,
+          agentId,
           language,
           conversationHistory: conversationHistory.map(msg => ({
             role: msg.role,
@@ -54,26 +92,39 @@ export const useAIChat = (): UseAIChatReturn => {
 
       if (fnError) {
         console.error('[EquityLabs] ai-chat invoke failed:', fnError);
-        if (isSimpleGreeting(message)) return localGreeting(language);
+        appendRuntimeError('ai-chat.invoke', fnError.message || 'Invoke failed');
+        if (isSimpleGreeting(message)) return { response: localGreeting(language), meta: { provider: 'local-fallback' } };
         throw new Error(fnError.message || 'Error calling AI service');
       }
 
       if (data?.error) {
         console.error('[EquityLabs] ai-chat returned error:', data.error, data);
-        if (isSimpleGreeting(message)) return localGreeting(language);
+        appendRuntimeError('ai-chat.response', String(data.error));
+        if (isSimpleGreeting(message)) return { response: localGreeting(language), meta: { provider: 'local-fallback' } };
         throw new Error(data.error);
       }
 
       if (!data?.response) {
         console.error('[EquityLabs] ai-chat returned empty response:', data);
-        if (isSimpleGreeting(message)) return localGreeting(language);
+        appendRuntimeError('ai-chat.empty', 'No response received from AI');
+        if (isSimpleGreeting(message)) return { response: localGreeting(language), meta: { provider: 'local-fallback' } };
         throw new Error('No response received from AI');
       }
 
-      return data.response;
+      markRuntimeHealth({
+        source: 'ai-chat',
+        status: 'ok',
+        effectiveModel: data?.meta?.effectiveModel || data?.meta?.model || null,
+      });
+
+      return {
+        response: data.response,
+        meta: data.meta || null,
+      };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
+      appendRuntimeError('ai-chat.catch', errorMessage);
       throw err;
     } finally {
       setIsLoading(false);

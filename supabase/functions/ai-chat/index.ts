@@ -2,10 +2,14 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  callPaidGateway,
   callAIWithCostControl,
+  getPaidProviderName,
   GOOGLE_FREE_MODEL,
   getUserPlanState,
+  hasPaidAIProvider,
   isFreePlan,
+  LOVABLE_AI_GATEWAY_URL,
   resolveModel,
   type AgentKey,
   type ChatMessage,
@@ -17,7 +21,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+const AGENT_ONE_ID = 'ag_01';
+const AGENT_ONE_MODEL = 'tencent/hy3:free';
+const AGENT_ONE_START_PROMPT = `Eres Agent 1 de EQuityLabs.
+Tu modelo obligatorio es tencent/hy3:free.
+Tu primera tarea es recibir al usuario, decir hola, presentarte con claridad y pedir el objetivo inicial.
+No menciones otros modelos, no delegates, no pidas integraciones al inicio salvo que el usuario lo pida.
+Responde en espanol claro, directo y breve.`;
 
 // Detect if message is a simple greeting
 function isGreeting(message: string): boolean {
@@ -255,8 +265,30 @@ function isAgentKey(value: unknown): value is AgentKey {
   return typeof value === 'string' && AGENT_KEYS.includes(value as AgentKey);
 }
 
-function reportedModel(plan: SubscriptionPlanKey, requestedModel: string): string {
-  return isFreePlan(plan) ? GOOGLE_FREE_MODEL : requestedModel;
+function resolvePaidProviderLabel(apiKey: string): string {
+  return getPaidProviderName(LOVABLE_AI_GATEWAY_URL, apiKey) || 'paid-provider';
+}
+
+function resolveProviderLabel(
+  plan: SubscriptionPlanKey,
+  paidProvider: string,
+  aiData?: Record<string, unknown>,
+): string {
+  if (isFreePlan(plan)) return 'google-free-tier';
+  return typeof aiData?.provider === 'string' ? aiData.provider : paidProvider;
+}
+
+function resolveEffectiveModel(
+  plan: SubscriptionPlanKey,
+  requestedModel: string,
+  aiData?: Record<string, unknown>,
+): string {
+  if (isFreePlan(plan)) return GOOGLE_FREE_MODEL;
+  return typeof aiData?.model === 'string' ? aiData.model : requestedModel;
+}
+
+function isAgentOne(agentId: unknown): boolean {
+  return agentId === AGENT_ONE_ID;
 }
 
 function callAI(
@@ -274,7 +306,7 @@ function callAI(
     plan,
     supabaseUrl,
     supabaseServiceRoleKey: supabaseKey,
-    gatewayUrl: AI_GATEWAY_URL,
+    gatewayUrl: LOVABLE_AI_GATEWAY_URL,
     paidApiKey: apiKey,
     model,
     messages,
@@ -283,7 +315,7 @@ function callAI(
 }
 
 serve(async (req) => {
-  console.log('[EQuityLabs] AI Chat via Lovable AI Gateway');
+  console.log('[EQuityLabs] AI Chat request received');
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -326,9 +358,10 @@ serve(async (req) => {
     const userPlan = await getUserPlanState(supabaseUrl, supabaseKey, userId);
     const activePlan = userPlan.plan;
     const apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
+    const paidProvider = resolvePaidProviderLabel(apiKey);
 
-    if (!isFreePlan(activePlan) && !apiKey) {
-      console.error('CRITICAL: LOVABLE_API_KEY not configured for paid AI routing');
+    if (!isFreePlan(activePlan) && !hasPaidAIProvider(LOVABLE_AI_GATEWAY_URL, apiKey)) {
+      console.error('CRITICAL: no paid AI provider configured. Expected OPENROUTER_API_KEY or LOVABLE_API_KEY');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -357,6 +390,62 @@ serve(async (req) => {
 
     const isFirstMessage = !conversationHistory || conversationHistory.length === 0;
     const isSimpleGreeting = isGreeting(message);
+    const useAgentOne = isAgentOne(agentId) || !agentId;
+
+    if (useAgentOne) {
+      const agentOneMessages: ChatMessage[] = [
+        {
+          role: 'system',
+          content: AGENT_ONE_START_PROMPT,
+        },
+        ...(conversationHistory || []),
+        {
+          role: 'user',
+          content: message,
+        },
+      ];
+
+      const aiResult = await callPaidGateway(
+        LOVABLE_AI_GATEWAY_URL,
+        apiKey,
+        AGENT_ONE_MODEL,
+        agentOneMessages,
+        700,
+      );
+
+      if (aiResult.error) {
+        return new Response(
+          JSON.stringify({ error: aiResult.error }),
+          { status: aiResult.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const assistantMessage = aiResult.data?.choices?.[0]?.message?.content;
+      if (!assistantMessage) {
+        return new Response(
+          JSON.stringify({ error: 'AI returned empty response.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          response: assistantMessage,
+          meta: {
+            model: typeof aiResult.data?.model === 'string' ? aiResult.data.model : AGENT_ONE_MODEL,
+            provider: typeof aiResult.data?.provider === 'string' ? aiResult.data.provider : 'openrouter',
+            requestedModel: AGENT_ONE_MODEL,
+            effectiveModel: typeof aiResult.data?.model === 'string' ? aiResult.data.model : AGENT_ONE_MODEL,
+            plan: activePlan,
+            route: 'agent:ag_01',
+            agentId: AGENT_ONE_ID,
+            availableTools,
+            usage: aiResult.data?.usage || null,
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Handle contextual greeting with available tools
     if (isFirstMessage && isSimpleGreeting && userId) {
@@ -395,7 +484,7 @@ serve(async (req) => {
       
       if (result.error) {
         return new Response(
-          JSON.stringify({ response: `❌ Error al acceder a Drive: ${result.error}`, meta: { action: 'drive_error', model: reportedModel(activePlan, resolveModel(activePlan, 'architect')), plan: activePlan } }),
+          JSON.stringify({ response: `❌ Error al acceder a Drive: ${result.error}`, meta: { action: 'drive_error', model: resolveEffectiveModel(activePlan, resolveModel(activePlan, 'architect')), provider: isFreePlan(activePlan) ? 'google-free-tier' : paidProvider, plan: activePlan } }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -415,8 +504,10 @@ serve(async (req) => {
       }
 
       const summary = aiResult.data?.choices?.[0]?.message?.content || 'No pude procesar los resultados de Drive.';
+      const driveProvider = resolveProviderLabel(activePlan, paidProvider, aiResult.data);
+      const driveModel = resolveEffectiveModel(activePlan, architectModel, aiResult.data);
       return new Response(
-        JSON.stringify({ response: summary, meta: { action: 'drive_search', model: reportedModel(activePlan, architectModel), requestedModel: architectModel, provider: isFreePlan(activePlan) ? 'google-free-tier' : 'paid-gateway', plan: activePlan, fileCount: result.data?.count || 0 } }),
+        JSON.stringify({ response: summary, meta: { action: 'drive_search', model: driveModel, requestedModel: architectModel, provider: driveProvider, plan: activePlan, fileCount: result.data?.count || 0 } }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -433,7 +524,7 @@ serve(async (req) => {
       
       if (result.error) {
         return new Response(
-          JSON.stringify({ response: `❌ Error al acceder a Sheets: ${result.error}`, meta: { action: 'sheets_error', model: reportedModel(activePlan, resolveModel(activePlan, 'logic')), plan: activePlan } }),
+          JSON.stringify({ response: `❌ Error al acceder a Sheets: ${result.error}`, meta: { action: 'sheets_error', model: resolveEffectiveModel(activePlan, resolveModel(activePlan, 'logic')), provider: isFreePlan(activePlan) ? 'google-free-tier' : paidProvider, plan: activePlan } }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -451,8 +542,10 @@ serve(async (req) => {
       }
 
       const analysis = aiResult.data?.choices?.[0]?.message?.content || 'No pude analizar los datos.';
+      const sheetsProvider = resolveProviderLabel(activePlan, paidProvider, aiResult.data);
+      const sheetsModel = resolveEffectiveModel(activePlan, logicModel, aiResult.data);
       return new Response(
-        JSON.stringify({ response: analysis, meta: { action: 'sheets_read', model: reportedModel(activePlan, logicModel), requestedModel: logicModel, provider: isFreePlan(activePlan) ? 'google-free-tier' : 'paid-gateway', plan: activePlan, rowCount: result.data?.rowCount || 0 } }),
+        JSON.stringify({ response: analysis, meta: { action: 'sheets_read', model: sheetsModel, requestedModel: logicModel, provider: sheetsProvider, plan: activePlan, rowCount: result.data?.rowCount || 0 } }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -469,7 +562,7 @@ serve(async (req) => {
         
         if (result.error) {
           return new Response(
-            JSON.stringify({ response: `❌ Error al acceder a Calendar: ${result.error}`, meta: { action: 'calendar_error', model: reportedModel(activePlan, resolveModel(activePlan, 'logic')), plan: activePlan } }),
+            JSON.stringify({ response: `❌ Error al acceder a Calendar: ${result.error}`, meta: { action: 'calendar_error', model: resolveEffectiveModel(activePlan, resolveModel(activePlan, 'logic')), provider: isFreePlan(activePlan) ? 'google-free-tier' : paidProvider, plan: activePlan } }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -479,7 +572,7 @@ serve(async (req) => {
         ).join('\n\n') || 'No hay eventos próximos';
 
         return new Response(
-          JSON.stringify({ response: `📆 **Tu Agenda**\n\n${eventsContext}`, meta: { action: 'calendar_list', model: reportedModel(activePlan, resolveModel(activePlan, 'logic')), plan: activePlan, eventCount: result.data?.count || 0 } }),
+          JSON.stringify({ response: `📆 **Tu Agenda**\n\n${eventsContext}`, meta: { action: 'calendar_list', model: resolveEffectiveModel(activePlan, resolveModel(activePlan, 'logic')), provider: isFreePlan(activePlan) ? 'google-free-tier' : paidProvider, plan: activePlan, eventCount: result.data?.count || 0 } }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -498,7 +591,7 @@ serve(async (req) => {
         
         if (result.error) {
           return new Response(
-            JSON.stringify({ response: `❌ Error al leer emails: ${result.error}`, meta: { action: 'gmail_read_error', model: reportedModel(activePlan, resolveModel(activePlan, 'recepcionista')), plan: activePlan } }),
+            JSON.stringify({ response: `❌ Error al leer emails: ${result.error}`, meta: { action: 'gmail_read_error', model: resolveEffectiveModel(activePlan, resolveModel(activePlan, 'recepcionista')), provider: isFreePlan(activePlan) ? 'google-free-tier' : paidProvider, plan: activePlan } }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -518,8 +611,10 @@ serve(async (req) => {
         }
 
         const emailSummary = aiResult.data?.choices?.[0]?.message?.content || 'No pude procesar los emails.';
+        const gmailProvider = resolveProviderLabel(activePlan, paidProvider, aiResult.data);
+        const gmailModel = resolveEffectiveModel(activePlan, receptionistModel, aiResult.data);
         return new Response(
-          JSON.stringify({ response: emailSummary, meta: { action: 'gmail_read', model: reportedModel(activePlan, receptionistModel), requestedModel: receptionistModel, provider: isFreePlan(activePlan) ? 'google-free-tier' : 'paid-gateway', plan: activePlan, emailCount: result.data?.count || 0 } }),
+          JSON.stringify({ response: emailSummary, meta: { action: 'gmail_read', model: gmailModel, requestedModel: receptionistModel, provider: gmailProvider, plan: activePlan, emailCount: result.data?.count || 0 } }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -534,7 +629,7 @@ serve(async (req) => {
 
         if (result.success) {
           return new Response(
-            JSON.stringify({ response: `✅ **Email enviado**\n\n📬 Destinatario: ${emailIntent.to}\n🆔 ID: \`${result.data.messageId}\``, meta: { action: 'gmail_sent', model: reportedModel(activePlan, resolveModel(activePlan, 'recepcionista')), plan: activePlan, messageId: result.data.messageId } }),
+            JSON.stringify({ response: `✅ **Email enviado**\n\n📬 Destinatario: ${emailIntent.to}\n🆔 ID: \`${result.data.messageId}\``, meta: { action: 'gmail_sent', model: resolveEffectiveModel(activePlan, resolveModel(activePlan, 'recepcionista')), provider: isFreePlan(activePlan) ? 'google-free-tier' : paidProvider, plan: activePlan, messageId: result.data.messageId } }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -557,7 +652,6 @@ serve(async (req) => {
     }
 
     console.log(`[EQuityLabs] Plan: ${activePlan} | Routing: ${routingReason} -> Model: ${modelToUse}`);
-    const modelReported = isFreePlan(activePlan) ? GOOGLE_FREE_MODEL : modelToUse;
 
     const toolsInfo = formatAvailableTools(availableTools);
     const equityLabsContext = `
@@ -590,6 +684,8 @@ ${agentId ? `\n## Modo Agente Activo: ${agentId}` : ''}
     ];
 
     const aiResult = await callAI(supabaseUrl, supabaseKey, userId, activePlan, apiKey, modelToUse, messages);
+    const provider = resolveProviderLabel(activePlan, paidProvider, aiResult.data);
+    const effectiveModel = resolveEffectiveModel(activePlan, modelToUse, aiResult.data);
 
     if (aiResult.error) {
       return new Response(
@@ -612,10 +708,10 @@ ${agentId ? `\n## Modo Agente Activo: ${agentId}` : ''}
       JSON.stringify({ 
         response: assistantMessage,
         meta: {
-          model: modelReported,
-          provider: isFreePlan(activePlan) ? 'google-free-tier' : 'paid-gateway',
+          model: effectiveModel,
+          provider,
           requestedModel: modelToUse,
-          effectiveModel: modelReported,
+          effectiveModel,
           plan: activePlan,
           route: routingReason,
           availableTools,

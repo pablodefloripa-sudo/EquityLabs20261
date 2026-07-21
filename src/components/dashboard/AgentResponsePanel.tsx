@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowRight, Brain, Cpu, Sparkles } from 'lucide-react';
+import { Cpu } from 'lucide-react';
 
 interface AgentResponsePanelProps {
   content: string;
@@ -12,50 +12,9 @@ interface AgentResponsePanelProps {
   isThinking?: boolean;
 }
 
-const parseSections = (content: string) => {
-  const reasoningRx = /(?:^|\n)#{0,3}\s*(?:razonamiento|reasoning|analysis|analisis)\s*:?\s*\n?/i;
-  const executionRx = /(?:^|\n)#{0,3}\s*(?:ejecucion|execution|respuesta|response)\s*:?\s*\n?/i;
-  const nextRx = /(?:^|\n)#{0,3}\s*(?:next\s*step|proximo\s*paso|siguiente\s*paso|siguientes\s*pasos|next\s*steps)\s*:?\s*\n?/i;
-
-  const rIdx = content.search(reasoningRx);
-  const eIdx = content.search(executionRx);
-  const nIdx = content.search(nextRx);
-
-  if (rIdx >= 0 || eIdx >= 0 || nIdx >= 0) {
-    const cuts = [
-      { key: 'reasoning', idx: rIdx },
-      { key: 'execution', idx: eIdx },
-      { key: 'next', idx: nIdx },
-    ].filter(c => c.idx >= 0).sort((a, b) => a.idx - b.idx);
-
-    const out: Record<string, string> = { reasoning: '', execution: '', next: '' };
-    cuts.forEach((c, i) => {
-      const start = c.idx;
-      const end = i + 1 < cuts.length ? cuts[i + 1].idx : content.length;
-      out[c.key] = content.slice(start, end).replace(/^[^\n]*\n?/, '').trim();
-    });
-
-    if (!out.execution && !out.reasoning) out.execution = content;
-    return out;
-  }
-
-  const paragraphs = content.split('\n\n').filter(Boolean);
-  if (paragraphs.length <= 1) {
-    return { reasoning: '', execution: content, next: '' };
-  }
-
-  const rEnd = Math.max(1, Math.floor(paragraphs.length * 0.25));
-  const nStart = Math.max(rEnd + 1, Math.floor(paragraphs.length * 0.9));
-  return {
-    reasoning: paragraphs.slice(0, rEnd).join('\n\n'),
-    execution: paragraphs.slice(rEnd, nStart).join('\n\n'),
-    next: paragraphs.slice(nStart).join('\n\n'),
-  };
-};
-
-const sanitize = (s: string): string => {
-  if (!s) return s;
-  return s
+const sanitize = (value: string): string => {
+  if (!value) return value;
+  return value
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}\u{FE0F}]/gu, '')
     .replace(/^\s{0,3}#{1,6}\s*/gm, '')
     .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
@@ -65,30 +24,6 @@ const sanitize = (s: string): string => {
     .trim();
 };
 
-const Section = ({
-  icon,
-  title,
-  children,
-  mascot,
-}: {
-  icon: ReactNode;
-  title: string;
-  children: string;
-  mascot?: boolean;
-}) => (
-  <section className="relative z-10 mb-4 last:mb-0">
-    <div className={`mb-2 flex items-center gap-2 border-b pb-1.5 ${mascot ? 'border-pink-400/25' : 'border-cyan-400/15'}`}>
-      {icon}
-      <span className={`text-[10px] font-bold uppercase tracking-widest ${mascot ? 'text-pink-300' : 'text-cyan-300'}`}>
-        {title}
-      </span>
-    </div>
-    <div className={`chat-markdown prose prose-invert max-w-none border-l-2 pl-3 font-mono text-[clamp(12px,calc(13px*var(--response-scale)),20px)] leading-relaxed ${mascot ? 'border-pink-400/35 text-pink-50/92' : 'border-cyan-400/25 text-cyan-50/88'}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
-    </div>
-  </section>
-);
-
 export const AgentResponsePanel = ({
   content,
   model = 'gemini-2.5-flash',
@@ -97,10 +32,6 @@ export const AgentResponsePanel = ({
   isThinking = false,
 }: AgentResponsePanelProps) => {
   const clean = sanitize(content);
-  const parsed = parseSections(clean);
-  const reasoning = sanitize(parsed.reasoning);
-  const execution = sanitize(parsed.execution);
-  const next = sanitize(parsed.next);
 
   return (
     <motion.div
@@ -110,24 +41,24 @@ export const AgentResponsePanel = ({
       className="relative w-full max-w-[min(100%,980px)] group"
       style={{ '--response-scale': responseScale } as CSSProperties}
     >
-      <div className="absolute -inset-px rounded-lg bg-cyan-400/25 blur-[1px]" />
+      <div className={`absolute -inset-px rounded-[22px] blur-[1px] ${mascot ? 'bg-pink-400/18' : 'bg-cyan-300/22'}`} />
 
       <div
-        className={`relative overflow-hidden rounded-lg border p-4 backdrop-blur-xl ${
+        className={`relative overflow-hidden rounded-[22px] border px-4 py-4 backdrop-blur-2xl ${
           mascot
-            ? 'border-pink-300/35 bg-pink-950/45 shadow-[0_0_30px_rgba(236,72,153,0.22)]'
-            : 'border-cyan-400/30 bg-black/58 shadow-[0_0_26px_rgba(34,211,238,0.16)]'
+            ? 'border-pink-300/30 bg-[linear-gradient(180deg,rgba(22,8,24,0.90)_0%,rgba(5,5,8,0.92)_100%)] shadow-[0_0_32px_rgba(236,72,153,0.18),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.08)]'
+            : 'border-cyan-300/30 bg-[linear-gradient(180deg,rgba(7,18,34,0.90)_0%,rgba(3,7,14,0.92)_100%)] shadow-[0_0_32px_rgba(34,211,238,0.18),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.08)]'
         }`}
       >
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.04]"
           style={{
-            backgroundImage: 'linear-gradient(rgba(34,211,238,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.45) 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
+            backgroundImage:
+              'radial-gradient(circle at 20% 0%, rgba(34,211,238,0.12), transparent 26%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.06), transparent 22%)',
           }}
         />
 
-        <div className="relative z-10 mb-3 flex items-center gap-2 font-mono">
+        <div className="relative z-10 mb-4 flex items-center gap-2 font-mono">
           {([
             ['bg-red-500/80', 'rgba(239,68,68,0.75)'],
             ['bg-yellow-500/80', 'rgba(234,179,8,0.75)'],
@@ -141,9 +72,9 @@ export const AgentResponsePanel = ({
               transition={isThinking ? { duration: 0.85, repeat: Infinity, delay: index * 0.16 } : { duration: 0.2 }}
             />
           ))}
-          <span className="ml-2 text-[10px] text-cyan-300/55">equitylabs://agent-response</span>
+          <span className="ml-2 text-[10px] text-cyan-200/55">equitylabs://agent-core</span>
           <Cpu className="ml-auto h-3 w-3 text-cyan-300/65" />
-          <span className="rounded border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] text-cyan-200/70">
+          <span className="rounded border border-cyan-400/12 bg-transparent px-1.5 py-0.5 text-[9px] text-cyan-200/62">
             {model}
           </span>
           <motion.div
@@ -153,28 +84,18 @@ export const AgentResponsePanel = ({
           />
         </div>
 
-        {reasoning && (
-          <Section icon={<Brain className="h-3.5 w-3.5 shrink-0 text-cyan-300" />} title="Razonamiento" mascot={mascot}>
-            {reasoning}
-          </Section>
-        )}
+        <div
+          className={`relative z-10 border-l-2 pl-4 font-mono text-[clamp(12px,calc(13px*var(--response-scale)),20px)] leading-relaxed ${
+            mascot ? 'border-pink-400/30 text-pink-50/92' : 'border-cyan-400/25 text-cyan-50/90'
+          }`}
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{clean}</ReactMarkdown>
+        </div>
 
-        {execution && (
-          <Section icon={<Sparkles className={`h-3.5 w-3.5 shrink-0 ${mascot ? 'text-pink-300' : 'text-cyan-300'}`} />} title={mascot ? 'Mascota' : 'Ejecucion'} mascot={mascot}>
-            {execution}
-          </Section>
-        )}
-
-        {next && (
-          <Section icon={<ArrowRight className="h-3.5 w-3.5 shrink-0 text-cyan-300" />} title="Next Step" mascot={mascot}>
-            {next}
-          </Section>
-        )}
-
-        <div className="absolute top-0 left-0 h-3 w-3 rounded-tl-lg border-l border-t border-cyan-400/45" />
-        <div className="absolute top-0 right-0 h-3 w-3 rounded-tr-lg border-r border-t border-cyan-400/35" />
-        <div className="absolute bottom-0 left-0 h-3 w-3 rounded-bl-lg border-b border-l border-cyan-400/35" />
-        <div className="absolute bottom-0 right-0 h-3 w-3 rounded-br-lg border-b border-r border-cyan-400/45" />
+        <div className="absolute top-0 left-0 h-3 w-3 rounded-tl-[22px] border-l border-t border-cyan-400/45" />
+        <div className="absolute top-0 right-0 h-3 w-3 rounded-tr-[22px] border-r border-t border-cyan-400/35" />
+        <div className="absolute bottom-0 left-0 h-3 w-3 rounded-bl-[22px] border-b border-l border-cyan-400/35" />
+        <div className="absolute bottom-0 right-0 h-3 w-3 rounded-br-[22px] border-b border-r border-cyan-400/45" />
       </div>
     </motion.div>
   );

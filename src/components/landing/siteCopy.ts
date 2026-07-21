@@ -1,6 +1,7 @@
 import type { LandingLang } from './LanguageFloater';
 
 export type LandingPlanCopy = {
+  trialLabel: string;
   freeLabel: string;
   paidLabel: string;
   freeCta: string;
@@ -44,6 +45,7 @@ export type SubscriptionPageCopy = {
 
 const landingPlanCopyByLang: Partial<Record<LandingLang, LandingPlanCopy>> = {
   en: {
+    trialLabel: 'FREE (30 Day Trial)',
     freeLabel: 'SOVEREIGN TRIAL',
     paidLabel: '2026 UPGRADE PATH',
     freeCta: 'Explore free trial',
@@ -56,6 +58,7 @@ const landingPlanCopyByLang: Partial<Record<LandingLang, LandingPlanCopy>> = {
     paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
   },
   es: {
+    trialLabel: 'FREE (30 Dias Trial)',
     freeLabel: 'TRIAL SOBERANO',
     paidLabel: 'RUTA DE UPGRADE 2026',
     freeCta: 'Explorar trial gratis',
@@ -64,6 +67,71 @@ const landingPlanCopyByLang: Partial<Record<LandingLang, LandingPlanCopy>> = {
       { title: 'Multiagente', detail: 'Varios agentes empujan un mismo objetivo.' },
       { title: 'Norte estrategico', detail: 'Definimos direccion real antes de escalar.' },
       { title: 'Hoja de ruta final', detail: 'Te llevas el siguiente paso, no solo prompts.' },
+    ],
+    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+  },
+  fr: {
+    trialLabel: 'FREE (Essai 30 jours)',
+    freeLabel: 'TRIAL SOUVERAIN',
+    paidLabel: 'ROUTE UPGRADE 2026',
+    freeCta: 'Explorer l essai gratuit',
+    upgradeCta: 'Voir les plans 2026',
+    freeHighlights: [
+      { title: 'Acces multi-agent', detail: 'Plusieurs agents poussent un meme objectif.' },
+      { title: 'Nord strategique', detail: 'Nous definissons la vraie direction avant de scaler.' },
+      { title: 'Feuille de route finale', detail: 'Vous repartez avec le prochain pas, pas seulement des prompts.' },
+    ],
+    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+  },
+  pt: {
+    trialLabel: 'FREE (Trial de 30 dias)',
+    freeLabel: 'TRIAL SOBERANO',
+    paidLabel: 'ROTA DE UPGRADE 2026',
+    freeCta: 'Explorar trial gratis',
+    upgradeCta: 'Ver planos 2026',
+    freeHighlights: [
+      { title: 'Multiagente', detail: 'Varios agentes empurram o mesmo objetivo.' },
+      { title: 'Norte estrategico', detail: 'Definimos a direcao real antes de escalar.' },
+      { title: 'Roteiro final', detail: 'Voce sai com o proximo passo, nao apenas prompts.' },
+    ],
+    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+  },
+  it: {
+    trialLabel: 'FREE (Trial 30 giorni)',
+    freeLabel: 'TRIAL SOVRANO',
+    paidLabel: 'PERCORSO UPGRADE 2026',
+    freeCta: 'Esplora trial gratis',
+    upgradeCta: 'Vedi piani 2026',
+    freeHighlights: [
+      { title: 'Multiagente', detail: 'Piu agenti spingono lo stesso obiettivo.' },
+      { title: 'Nord strategico', detail: 'Definiamo la direzione reale prima di scalare.' },
+      { title: 'Roadmap finale', detail: 'Esci con il prossimo passo, non solo prompt.' },
+    ],
+    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+  },
+  de: {
+    trialLabel: 'FREE (30 Tage Trial)',
+    freeLabel: 'SOUVERANER TRIAL',
+    paidLabel: 'UPGRADE-PFAD 2026',
+    freeCta: 'Gratis-Trial erkunden',
+    upgradeCta: 'Plane 2026 ansehen',
+    freeHighlights: [
+      { title: 'Multi-Agenten', detail: 'Mehrere Agenten treiben dasselbe Ziel voran.' },
+      { title: 'Strategischer Norden', detail: 'Wir definieren die echte Richtung vor dem Skalieren.' },
+      { title: 'Finale Roadmap', detail: 'Du gehst mit dem nachsten Schritt, nicht nur mit Prompts.' },
+    ],
+    paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
+  },
+  pl: {
+    trialLabel: 'FREE (Trial 30 dni)',
+    freeLabel: 'SUWERENNY TRIAL',
+    paidLabel: 'SCIEZKA UPGRADE 2026',
+    freeCta: 'Odkryj darmowy trial',
+    upgradeCta: 'Zobacz plany 2026',
+    freeHighlights: [
+      { title: 'Multiagent', detail: 'Wielu agentow pcha ten sam cel.' },
+      { title: 'Strategiczna polnoc', detail: 'Definiujemy prawdziwy kierunek przed skalowaniem.' },
+      { title: 'Finalna mapa drogowa', detail: 'Wychodzisz z kolejnym krokiem, nie tylko z promptami.' },
     ],
     paidHighlights: ['$25 Tactical', '$50 Premium', '$100 Mastermind'],
   },

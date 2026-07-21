@@ -3,9 +3,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   callAIWithCostControl,
+  getPaidProviderName,
   GOOGLE_FREE_MODEL,
   getUserPlanState,
+  hasPaidAIProvider,
   isFreePlan,
+  LOVABLE_AI_GATEWAY_URL,
   type ChatMessage,
 } from "../_shared/subscription-routing.ts";
 
@@ -13,8 +16,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
 type ToolKey =
   | 'deep_research'
@@ -108,8 +109,9 @@ serve(async (req) => {
 
     const userPlan = await getUserPlanState(supabaseUrl, supabaseKey, userId);
     const apiKey = Deno.env.get('LOVABLE_API_KEY') || '';
+    const paidProvider = getPaidProviderName(LOVABLE_AI_GATEWAY_URL, apiKey) || 'paid-provider';
 
-    if (!isFreePlan(userPlan.plan) && !apiKey) {
+    if (!isFreePlan(userPlan.plan) && !hasPaidAIProvider(LOVABLE_AI_GATEWAY_URL, apiKey)) {
       return new Response(JSON.stringify({ error: 'AI no configurado' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -125,7 +127,7 @@ serve(async (req) => {
       plan: userPlan.plan,
       supabaseUrl,
       supabaseServiceRoleKey: supabaseKey,
-      gatewayUrl: AI_GATEWAY_URL,
+      gatewayUrl: LOVABLE_AI_GATEWAY_URL,
       paidApiKey: apiKey,
       model: cfg.model,
       messages,
@@ -140,11 +142,21 @@ serve(async (req) => {
     }
 
     const content = aiResult.data?.choices?.[0]?.message?.content || '';
+    const effectiveModel = isFreePlan(userPlan.plan)
+      ? GOOGLE_FREE_MODEL
+      : typeof aiResult.data?.model === 'string'
+        ? aiResult.data.model
+        : cfg.model;
+    const provider = isFreePlan(userPlan.plan)
+      ? 'google-free-tier'
+      : typeof aiResult.data?.provider === 'string'
+        ? aiResult.data.provider
+        : paidProvider;
     return new Response(JSON.stringify({
       content,
-      model: isFreePlan(userPlan.plan) ? GOOGLE_FREE_MODEL : cfg.model,
+      model: effectiveModel,
       requestedModel: cfg.model,
-      provider: isFreePlan(userPlan.plan) ? 'google-free-tier' : 'paid-gateway',
+      provider,
       plan: userPlan.plan,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

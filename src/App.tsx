@@ -10,6 +10,8 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Suscripciones from "./pages/Suscripciones";
 import Diagnostico from "./pages/Diagnostico";
+import OAuthConsent from "./pages/OAuthConsent";
+import BusinessBuilderWelcome from "./pages/BusinessBuilderWelcome";
 import { AuthGuard } from "./components/auth/AuthGuard";
 import { LanguageProvider } from "./hooks/useLanguage";
 
@@ -28,6 +30,12 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/suscripciones" element={<Suscripciones />} />
             <Route path="/diagnostico" element={<Diagnostico />} />
+            <Route path="/oauth/consent" element={<OAuthConsent />} />
+            <Route path="/business-builder" element={
+              <AuthGuard>
+                <BusinessBuilderWelcome />
+              </AuthGuard>
+            } />
             <Route path="/dashboard" element={
               <AuthGuard>
                 <Index />

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/runtime-client';
 import { useToast } from '@/hooks/use-toast';
 import { buildAuthRedirectUrl } from '@/lib/auth-redirect';
+import { clearPendingGoogleOAuth, markGoogleOAuthPending } from '@/lib/oauth-state';
 import type { Session } from '@supabase/supabase-js';
 
 interface UseGoogleOAuthReturn {
@@ -116,6 +117,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
   const connectGoogle = useCallback(async () => {
     try {
+      markGoogleOAuthPending();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -128,6 +130,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
       if (error) throw error;
     } catch (error) {
+      clearPendingGoogleOAuth();
       console.error('Error connecting to Google:', error);
       const message = error instanceof Error ? error.message : String(error);
       const isMissingSecret = message.toLowerCase().includes('missing oauth secret');
@@ -144,6 +147,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
   const connectGoogleWorkspace = useCallback(async () => {
     try {
+      markGoogleOAuthPending();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -158,6 +162,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
       if (error) throw error;
     } catch (error) {
+      clearPendingGoogleOAuth();
       console.error('Error connecting Google Workspace:', error);
       toast({
         title: 'Permiso no iniciado',
@@ -185,6 +190,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
       if (authError) {
         cleanAuthUrl(url);
+        clearPendingGoogleOAuth();
         console.error('OAuth callback returned an auth error:', authError);
         return false;
       }
@@ -202,6 +208,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
       const session = await waitForSession();
       cleanAuthUrl(url);
+      clearPendingGoogleOAuth();
 
       if (!session) {
         console.error('OAuth callback completed, but no active Supabase session was found.');
@@ -217,6 +224,7 @@ export const useGoogleOAuth = (): UseGoogleOAuthReturn => {
 
       return true;
     } catch (error) {
+      clearPendingGoogleOAuth();
       console.error('Error handling OAuth callback:', error instanceof Error ? error.message : error);
       return false;
     }

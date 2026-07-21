@@ -8,6 +8,7 @@ export type LandingLang = 'en' | 'es' | 'it' | 'pt' | 'fr' | 'de' | 'pl' | 'nl';
 interface Props {
   lang: LandingLang;
   onChange: (l: LandingLang) => void;
+  className?: string;
 }
 
 const flags: Record<LandingLang, string> = {
@@ -32,11 +33,11 @@ const langToAppLanguage: Record<LandingLang, Language> = {
   nl: 'NL',
 };
 
-export const LanguageFloater = ({ lang, onChange }: Props) => {
+export const LanguageFloater = ({ lang, onChange, className }: Props) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="fixed right-4 top-4 z-[100]">
+    <div className={className || 'fixed right-4 top-4 z-[100]'}>
       <button
         onClick={() => setOpen((value) => !value)}
         className="flex items-center gap-2 rounded-full border border-cyan-500/40 bg-black/60 px-3 py-1.5 text-xs tracking-wide text-cyan-400 backdrop-blur-xl transition-colors hover:border-cyan-400"

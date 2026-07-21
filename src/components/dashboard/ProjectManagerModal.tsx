@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/runtime-client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { AppBunkerPanel } from './AppBunkerPanel';
+import { ProjectMindMapStudio } from './ProjectMindMapStudio';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type Tab = 'chats' | 'assets';
+type Tab = 'bunker' | 'maps' | 'chats' | 'assets';
 
 interface LocalFile {
   name: string;
@@ -30,7 +32,7 @@ const getFileIcon = (name: string) => {
 };
 
 export const ProjectManagerModal = ({ isOpen, onClose }: ProjectManagerModalProps) => {
-  const [tab, setTab] = useState<Tab>('chats');
+  const [tab, setTab] = useState<Tab>('bunker');
   const [chats, setChats] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [localFiles, setLocalFiles] = useState<LocalFile[]>([]);
@@ -121,9 +123,16 @@ export const ProjectManagerModal = ({ isOpen, onClose }: ProjectManagerModalProp
 
   useEffect(() => {
     if (!isOpen) return;
+    if (tab === 'maps' || tab === 'bunker') return;
     if (tab === 'chats') fetchChats();
     else fetchAssets();
   }, [isOpen, tab, fetchChats, fetchAssets]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTab('bunker');
+    }
+  }, [isOpen]);
 
   const deleteChat = async (projectId: string) => {
     if (!user) return;
@@ -211,7 +220,9 @@ export const ProjectManagerModal = ({ isOpen, onClose }: ProjectManagerModalProp
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="relative z-10 modal-cyber w-full max-w-lg mx-4 max-h-[80vh] flex flex-col rounded-2xl overflow-hidden"
+            className={`relative z-10 modal-cyber mx-4 flex w-full flex-col overflow-hidden rounded-2xl ${
+              tab === 'maps' || tab === 'bunker' ? 'max-w-7xl h-[88vh]' : 'max-w-lg max-h-[80vh]'
+            }`}
           >
             <div className="flex items-center justify-between p-4 border-b border-cyan-400/15">
               <h2 className="modal-cyber-title text-sm font-semibold">Project Manager</h2>
@@ -220,7 +231,7 @@ export const ProjectManagerModal = ({ isOpen, onClose }: ProjectManagerModalProp
 
             {/* Tabs */}
             <div className="flex border-b border-border/20">
-              {(['chats', 'assets'] as Tab[]).map(t => (
+              {(['bunker', 'maps', 'chats', 'assets'] as Tab[]).map(t => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -229,12 +240,24 @@ export const ProjectManagerModal = ({ isOpen, onClose }: ProjectManagerModalProp
                   }`}
                   style={tab === t ? { borderColor: '#22d3ee', color: '#22d3ee' } : {}}
                 >
-                  {t === 'chats' ? 'Chats & Projects' : 'Assets & Files'}
+                  {t === 'bunker'
+                    ? 'Bunker'
+                    : t === 'maps'
+                      ? 'Root Maps'
+                      : t === 'chats'
+                        ? 'Chats & Projects'
+                        : 'Assets & Files'}
                 </button>
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
+            <div className={`flex-1 ${tab === 'maps' || tab === 'bunker' ? 'min-h-0 overflow-hidden' : 'overflow-y-auto p-4 space-y-2 scrollbar-thin'}`}>
+              {tab === 'bunker' ? (
+                <AppBunkerPanel isOpen={isOpen} />
+              ) : tab === 'maps' ? (
+                <ProjectMindMapStudio isOpen={isOpen} />
+              ) : (
+                <div className="space-y-2 p-4">
               {loading ? (
                 <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
               ) : tab === 'chats' ? (
@@ -336,6 +359,8 @@ export const ProjectManagerModal = ({ isOpen, onClose }: ProjectManagerModalProp
                     </div>
                   ))}
                 </>
+              )}
+                </div>
               )}
             </div>
           </motion.div>

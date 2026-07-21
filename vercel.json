@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    {
+      "source": "/EquityLabs20261/:path*",
+      "destination": "/:path*",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/((?!api/|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

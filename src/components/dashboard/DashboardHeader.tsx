@@ -79,8 +79,11 @@ export const DashboardHeader = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-lg text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50"
-              onClick={onFocusConsole}
-              title="Buscar en consola"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('eq:open-task-panel'));
+                onFocusConsole?.();
+              }}
+              title="Abrir hoja de ruta"
             >
               <Search className="w-4 h-4" />
             </Button>
@@ -88,8 +91,11 @@ export const DashboardHeader = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-lg text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50"
-              onClick={() => window.dispatchEvent(new CustomEvent('eq:response-zoom-in'))}
-              title="Agrandar ventanas"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('eq:response-zoom-in'));
+                window.dispatchEvent(new CustomEvent('eq:task-panel-zoom-in'));
+              }}
+              title="Agrandar hoja de ruta"
             >
               <ZoomIn className="w-4 h-4" />
             </Button>
@@ -97,8 +103,11 @@ export const DashboardHeader = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-lg text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50"
-              onClick={() => window.dispatchEvent(new CustomEvent('eq:response-zoom-out'))}
-              title="Achicar ventanas"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('eq:response-zoom-out'));
+                window.dispatchEvent(new CustomEvent('eq:task-panel-zoom-out'));
+              }}
+              title="Achicar hoja de ruta"
             >
               <ZoomOut className="w-4 h-4" />
             </Button>

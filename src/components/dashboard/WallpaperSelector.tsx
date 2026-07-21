@@ -7,7 +7,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import wpHexSphere from '@/assets/wp-hex-sphere.jpg';
 import wpTechCircle from '@/assets/wp-tech-circle.webp';
-import wpStripes from '@/assets/wp-3d-stripes.jpg';
 import wpMeshCurve from '@/assets/wp-mesh-curve.jpg';
 
 interface WallpaperSelectorProps {
@@ -29,14 +28,6 @@ const PRESET_WALLPAPERS = [
     name: 'Tech Circle',
     thumbnail: `url(${wpTechCircle})`,
     url: wpTechCircle,
-    isGradient: false,
-    type: 'image' as const,
-  },
-  {
-    id: 'stripes-3d',
-    name: '3D Stripes',
-    thumbnail: `url(${wpStripes})`,
-    url: wpStripes,
     isGradient: false,
     type: 'image' as const,
   },

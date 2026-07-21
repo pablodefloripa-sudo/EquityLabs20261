@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useWallpaperSettings } from './WallpaperSelector';
 import defaultWallpaper from '@/assets/default-wallpaper.jpg';
+import meshCurveWallpaper from '@/assets/wp-mesh-curve.jpg';
 
 const PRESET_GRADIENTS: Record<string, string> = {
   'carbon': 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)',
@@ -16,8 +17,9 @@ export const CustomBackground = memo(() => {
     if (settings.type === 'preset' && settings.presetId) {
       // Image preset
       if (settings.presetType === 'image' && settings.presetUrl) {
+        const resolvedUrl = settings.presetId === 'stripes-3d' ? meshCurveWallpaper : settings.presetUrl;
         return {
-          backgroundImage: `url(${settings.presetUrl})`,
+          backgroundImage: `url(${resolvedUrl})`,
           backgroundSize: 'contain',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -39,13 +41,13 @@ export const CustomBackground = memo(() => {
         backgroundImage: `url(${settings.customUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        opacity: settings.opacity,
+        opacity: 1,
       };
     }
 
     // Default wallpaper
     return {
-      backgroundImage: `url(${defaultWallpaper})`,
+      backgroundImage: `url(${meshCurveWallpaper || defaultWallpaper})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       opacity: settings.opacity ?? 0.35,

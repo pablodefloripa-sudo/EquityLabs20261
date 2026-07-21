@@ -1,12 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Image as ImageIcon, Layout, Telescope, Clapperboard, Music,
-  GraduationCap, Sparkles, FileBarChart, TrendingUp, Loader2,
+  GraduationCap, Sparkles, FileBarChart, TrendingUp,
   BarChart3, Cat, Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MascotCreatorModal } from './MascotCreatorModal';
@@ -46,13 +45,16 @@ interface InlineToolsPanelProps {
 }
 
 export const InlineToolsPanel = ({ open, onClose }: InlineToolsPanelProps) => {
-  const [activeTool, setActiveTool] = useState<ToolDef | null>(null);
+  const [selectedTool, setSelectedTool] = useState<ToolDef | null>(null);
   const [mascotOpen, setMascotOpen] = useState(false);
-  const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const closeAll = () => { setActiveTool(null); setPrompt(''); setLoading(false); };
+  const clearSelectedTool = () => {
+    setSelectedTool(null);
+    setLoading(false);
+    window.dispatchEvent(new CustomEvent('eq:inline-tool-cleared'));
+  };
 
   const handlePick = (tool: ToolDef) => {
     onClose();
@@ -62,37 +64,90 @@ export const InlineToolsPanel = ({ open, onClose }: InlineToolsPanelProps) => {
       return;
     }
     if (tool.key === 'mascot') { setMascotOpen(true); return; }
-    setActiveTool(tool);
+    setSelectedTool(tool);
+    window.dispatchEvent(new CustomEvent('eq:inline-tool-selected', {
+      detail: { key: tool.key, label: tool.label },
+    }));
   };
 
-  const handleRun = async () => {
-    if (!activeTool || !prompt.trim() || loading) return;
-    setLoading(true);
-    window.dispatchEvent(new CustomEvent('eq:tool-user-prompt', {
-      detail: { tool: activeTool.label, prompt: prompt.trim() }
-    }));
-    try {
-      if (activeTool.key === 'create_image') {
-        const { data, error } = await supabase.functions.invoke('generate-image', { body: { prompt: prompt.trim() } });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        window.dispatchEvent(new CustomEvent('eq:tool-result', {
-          detail: { tool: activeTool.label, model: 'gemini-2.5-flash-image', imageUrl: data.imageUrl }
-        }));
-      } else {
-        const { data, error } = await supabase.functions.invoke('tools-ai', { body: { tool: activeTool.key, prompt: prompt.trim() } });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        window.dispatchEvent(new CustomEvent('eq:tool-result', {
-          detail: { tool: activeTool.label, model: data.model || 'gemini-2.5-flash', content: data.content }
-        }));
+  useEffect(() => {
+    const handleRunSelectedTool = async (event: Event) => {
+      const detail = (event as CustomEvent<{
+        prompt?: string;
+        preferredModel?: string;
+        agentId?: string;
+      }>).detail || {};
+      const prompt = detail.prompt?.trim();
+      const preferredModel = detail.preferredModel?.trim();
+
+      if (!selectedTool || !prompt || loading) return;
+
+      setLoading(true);
+      window.dispatchEvent(new CustomEvent('eq:tool-user-prompt', {
+        detail: { tool: selectedTool.label, prompt },
+      }));
+
+      try {
+        if (selectedTool.key === 'create_image') {
+          const { data, error } = await supabase.functions.invoke('generate-image', {
+            body: {
+              prompt,
+              preferredModel,
+              agentId: detail.agentId || null,
+            },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          window.dispatchEvent(new CustomEvent('eq:tool-result', {
+            detail: {
+              tool: selectedTool.label,
+              model: data.model || preferredModel || 'image-generation',
+              imageUrl: data.imageUrl,
+            },
+          }));
+        } else {
+          const dashboardContext = (window as unknown as {
+            __eqDashboardContext?: {
+              subscription?: { key?: string; tier?: string; displayPlan?: string };
+              activeAgent?: { id?: string; name?: string; engine?: string };
+            };
+          }).__eqDashboardContext;
+
+          const { data, error } = await supabase.functions.invoke('tools-ai', {
+            body: {
+              tool: selectedTool.key,
+              prompt,
+              preferredModel,
+              agentId: detail.agentId || dashboardContext?.activeAgent?.id || null,
+              subscriptionPlan: dashboardContext?.subscription?.displayPlan || dashboardContext?.subscription?.key || null,
+            },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          window.dispatchEvent(new CustomEvent('eq:tool-result', {
+            detail: {
+              tool: selectedTool.label,
+              model: data.model || preferredModel || 'gemini-2.5-flash',
+              content: data.content,
+            },
+          }));
+        }
+        clearSelectedTool();
+      } catch (e) {
+        toast({ title: 'Error', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' });
+        setLoading(false);
       }
-      closeAll();
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Error', variant: 'destructive' });
-      setLoading(false);
-    }
-  };
+    };
+
+    const handleClear = () => clearSelectedTool();
+
+    window.addEventListener('eq:run-selected-tool', handleRunSelectedTool);
+    window.addEventListener('eq:inline-tool-clear-request', handleClear);
+    return () => {
+      window.removeEventListener('eq:run-selected-tool', handleRunSelectedTool);
+      window.removeEventListener('eq:inline-tool-clear-request', handleClear);
+    };
+  }, [loading, selectedTool, toast]);
 
   return (
     <>
@@ -152,41 +207,6 @@ export const InlineToolsPanel = ({ open, onClose }: InlineToolsPanelProps) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Tool execution dialog */}
-      <Dialog open={!!activeTool} onOpenChange={(v) => { if (!v) closeAll(); }}>
-        <DialogContent className="max-w-2xl bg-black/95 border-cyan-400/30 backdrop-blur-2xl">
-          {activeTool && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
-                  <activeTool.icon className="w-5 h-5 text-cyan-300" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-foreground">{activeTool.label}</h2>
-                  <p className="text-xs text-muted-foreground/70">{activeTool.description}</p>
-                </div>
-              </div>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder={activeTool.placeholder}
-                rows={4}
-                disabled={loading}
-                autoFocus
-                className="w-full bg-white/5 border border-cyan-400/20 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none resize-none focus:border-cyan-400/60 transition-all disabled:opacity-50"
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={closeAll} disabled={loading}>Cancelar</Button>
-                <Button onClick={handleRun} disabled={!prompt.trim() || loading}
-                  className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-100 border border-cyan-400/40">
-                  {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando...</>) : 'Ejecutar'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <MascotCreatorModal open={mascotOpen} onClose={() => setMascotOpen(false)} />
     </>

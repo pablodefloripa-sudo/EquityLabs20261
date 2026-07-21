@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -11,6 +11,12 @@ interface CollapsibleSidebarProps {
   defaultOpen?: boolean;
   tabPosition?: string;
   widthClassName?: string;
+  maxWidth?: string;
+  panelWidth?: string;
+  alignment?: 'edge' | 'center';
+  hideClosedTab?: boolean;
+  openEventName?: string;
+  closeEventName?: string;
 }
 
 export const CollapsibleSidebar = ({
@@ -21,16 +27,46 @@ export const CollapsibleSidebar = ({
   defaultOpen = false,
   tabPosition,
   widthClassName = 'w-80',
+  maxWidth = '50vw',
+  panelWidth,
+  alignment = 'edge',
+  hideClosedTab = false,
+  openEventName,
+  closeEventName,
 }: CollapsibleSidebarProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const isLeft = side === 'left';
+  const isCentered = alignment === 'center';
+
+  useEffect(() => {
+    if (!openEventName && !closeEventName) return;
+
+    const openPanel = () => setIsOpen(true);
+    const closePanel = () => setIsOpen(false);
+
+    if (openEventName) {
+      window.addEventListener(openEventName, openPanel);
+    }
+    if (closeEventName) {
+      window.addEventListener(closeEventName, closePanel);
+    }
+
+    return () => {
+      if (openEventName) {
+        window.removeEventListener(openEventName, openPanel);
+      }
+      if (closeEventName) {
+        window.removeEventListener(closeEventName, closePanel);
+      }
+    };
+  }, [openEventName, closeEventName]);
 
   return (
     <>
       {/* Collapsed Tab */}
       <AnimatePresence>
-        {!isOpen && (
+        {!isOpen && !hideClosedTab && (
           <motion.button
             initial={{ opacity: 0, x: isLeft ? -20 : 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -43,8 +79,8 @@ export const CollapsibleSidebar = ({
                        hover:border-cyan-200/70 hover:shadow-[0_0_52px_rgba(34,211,238,0.42),0_0_22px_rgba(6,182,212,0.42)_inset]
                        ${isLeft ? 'left-0 rounded-r-xl' : 'right-0 rounded-l-xl'}`}
             style={{
-              top: tabPosition || '50%',
-              transform: tabPosition ? 'none' : 'translateY(-50%)',
+              top: tabPosition || 'var(--dashboard-sidebar-top)',
+              transform: 'none',
               writingMode: 'vertical-rl',
               textOrientation: 'mixed',
             }}
@@ -71,22 +107,37 @@ export const CollapsibleSidebar = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/20 z-20"
+              className="fixed z-20 bg-black/10"
+              style={{
+                top: 'var(--dashboard-sidebar-top)',
+                bottom: 'var(--dashboard-sidebar-bottom)',
+                left: 0,
+                right: 0,
+              }}
               onClick={() => setIsOpen(false)}
             />
             
             {/* Panel con altura ajustada y posición alineada */}
             <motion.div
-              initial={{ x: isLeft ? -320 : 320, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: isLeft ? -320 : 320, opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className={`dashboard-neon-surface fixed top-24 bottom-auto z-30 ${widthClassName}
+              initial={{ y: -32, opacity: 0, scaleY: 0.92, scaleX: 0.985 }}
+              animate={{ y: 0, opacity: 1, scaleY: 1, scaleX: 1 }}
+              exit={{ y: -24, opacity: 0, scaleY: 0.94, scaleX: 0.99 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+              className={`dashboard-neon-surface fixed z-30 ${widthClassName}
                          shadow-2xl
-                         ${isLeft ? 'left-0 rounded-l-none' : 'right-0 rounded-r-none'}`}
+                         ${
+                           isCentered
+                             ? 'rounded-[24px]'
+                             : isLeft
+                               ? 'left-0 rounded-l-none'
+                               : 'right-0 rounded-r-none'
+                         }`}
               style={{
-                height: 'calc(100vh - 320px)',
-                maxHeight: '60vh',
+                top: 'var(--dashboard-sidebar-top)',
+                bottom: 'var(--dashboard-sidebar-bottom)',
+                height: 'auto',
+                width: panelWidth,
+                maxWidth,
                 minHeight: '280px',
                 borderRadius: '16px',
                 border: '2px solid transparent',
@@ -94,6 +145,10 @@ export const CollapsibleSidebar = ({
                 backgroundOrigin: 'border-box',
                 backgroundClip: 'padding-box, border-box',
                 animation: 'borderGlow 4s ease-in-out infinite',
+                transformOrigin: isCentered ? 'top center' : isLeft ? 'top left' : 'top right',
+                left: isCentered ? '50%' : undefined,
+                right: isCentered ? undefined : isLeft ? undefined : 0,
+                transform: isCentered ? 'translateX(-50%)' : undefined,
               }}
             >
               {/* Borde animado overlay */}

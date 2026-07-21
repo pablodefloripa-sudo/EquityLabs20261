@@ -79,12 +79,12 @@ export const GlassCockpit = ({ onClose }: GlassCockpitProps) => {
       // Build conversation history for context
       const history = messages.map(m => ({ role: m.role, content: m.content }));
       
-      const response = await sendMessage(currentInput, history);
+      const result = await sendMessage(currentInput, history);
       
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response,
+        content: result.response,
         timestamp: new Date(),
       };
 

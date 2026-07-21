@@ -85,12 +85,21 @@
 
   html {
     font-family: var(--font-display);
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     background: var(--gradient-dark);
     min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
   }
 
   /* Custom Scrollbar */
@@ -691,4 +700,50 @@
   border: none;
   border-top: 1px solid hsl(var(--border) / 0.3);
   margin: 0.75rem 0;
+}
+
+@keyframes eqSpectrumFlow {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 0% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+.eq-spectrum-frame {
+  position: relative;
+}
+
+.eq-spectrum-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 2px;
+  background: linear-gradient(180deg, #f59e0b 0%, #facc15 18%, #c084fc 48%, #60a5fa 76%, #22d3ee 100%);
+  background-size: 100% 220%;
+  animation: eqSpectrumFlow 8s ease-in-out infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+.eq-spectrum-box {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.eq-spectrum-box::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, #f59e0b 0%, #facc15 18%, #c084fc 48%, #60a5fa 76%, #22d3ee 100%);
+  background-size: 100% 220%;
+  animation: eqSpectrumFlow 8s ease-in-out infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.95;
 }

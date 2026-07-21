@@ -39,14 +39,23 @@ export interface ChatMessage {
   content: string;
 }
 
+export type PaidProviderName = 'openrouter' | 'gateway';
+
 export interface AIProviderResult {
-  data?: {
+  data?: Record<string, unknown> & {
     choices?: Array<{ message?: { content?: string } }>;
     usage?: unknown;
+    model?: string;
+    provider?: PaidProviderName | 'google-free-tier';
+    requestedModel?: string;
   };
   error?: string;
   status: number;
 }
+
+export const LOVABLE_AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+export const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+export const OPENROUTER_FALLBACK_MODEL = Deno.env.get('OPENROUTER_FALLBACK_MODEL') || 'openai/gpt-4o-mini';
 
 export const PLAN_MODEL_ROUTING: Record<SubscriptionPlanKey, PlanModelRouting> = {
   FREE_30_DAYS: {
@@ -165,6 +174,103 @@ const LEGACY_PLAN_MAP: Record<string, SubscriptionPlanKey> = {
 export const GOOGLE_FREE_MODEL = Deno.env.get('FREE_GOOGLE_MODEL') || 'gemini-2.5-flash-lite';
 const localFreeUsage = new Map<string, { day: string; count: number }>();
 
+function getOpenRouterHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'X-OpenRouter-Title': 'EQuityLabs AI',
+  };
+  const referer =
+    Deno.env.get('OPENROUTER_HTTP_REFERER')
+    || Deno.env.get('PUBLIC_SITE_URL')
+    || Deno.env.get('SITE_URL');
+
+  if (referer) {
+    headers['HTTP-Referer'] = referer;
+  }
+
+  return headers;
+}
+
+function resolvePaidProvider(
+  gatewayUrl: string,
+  paidApiKey: string,
+): { name: PaidProviderName; gatewayUrl: string; apiKey: string; extraHeaders?: Record<string, string> } | null {
+  const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY') || '';
+  if (openRouterApiKey) {
+    return {
+      name: 'openrouter',
+      gatewayUrl: OPENROUTER_CHAT_URL,
+      apiKey: openRouterApiKey,
+      extraHeaders: getOpenRouterHeaders(),
+    };
+  }
+
+  if (paidApiKey) {
+    return {
+      name: 'gateway',
+      gatewayUrl,
+      apiKey: paidApiKey,
+    };
+  }
+
+  return null;
+}
+
+function shouldRetryWithOpenRouterFallback(
+  status: number,
+  responseText: string,
+  model: string,
+  fallbackModel: string,
+): boolean {
+  if (model === fallbackModel) return false;
+  if (status !== 400 && status !== 404) return false;
+
+  const lowerText = responseText.toLowerCase();
+  return (
+    lowerText.includes('model')
+    || lowerText.includes('not found')
+    || lowerText.includes('unavailable')
+    || lowerText.includes('no endpoints')
+    || lowerText.includes('unknown')
+  );
+}
+
+async function executePaidChatCompletion(
+  provider: { name: PaidProviderName; gatewayUrl: string; apiKey: string; extraHeaders?: Record<string, string> },
+  model: string,
+  messages: ChatMessage[],
+  maxTokens = 500,
+) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${provider.apiKey}`,
+    'Content-Type': 'application/json',
+    ...(provider.extraHeaders || {}),
+  };
+
+  const response = await fetch(provider.gatewayUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
+  });
+
+  return {
+    response,
+    responseText: await response.text(),
+  };
+}
+
+export function hasPaidAIProvider(gatewayUrl: string, paidApiKey: string): boolean {
+  return resolvePaidProvider(gatewayUrl, paidApiKey) !== null;
+}
+
+export function getPaidProviderName(gatewayUrl: string, paidApiKey: string): PaidProviderName | null {
+  return resolvePaidProvider(gatewayUrl, paidApiKey)?.name || null;
+}
+
 export function normalizePlan(plan: string | null | undefined): SubscriptionPlanKey {
   if (!plan) return 'FREE_30_DAYS';
   if (plan in PLAN_MODEL_ROUTING) return plan as SubscriptionPlanKey;
@@ -242,27 +348,46 @@ export async function callPaidGateway(
   messages: ChatMessage[],
   maxTokens = 500,
 ): Promise<AIProviderResult> {
-  const response = await fetch(gatewayUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    }),
-  });
+  const provider = resolvePaidProvider(gatewayUrl, apiKey);
+  if (!provider) {
+    return {
+      error: 'No paid AI provider configured. Set OPENROUTER_API_KEY or LOVABLE_API_KEY.',
+      status: 503,
+    };
+  }
 
-  const responseText = await response.text();
+  const requestedModel = model;
+  let effectiveModel = model;
+  let { response, responseText } = await executePaidChatCompletion(
+    provider,
+    effectiveModel,
+    messages,
+    maxTokens,
+  );
+
+  if (
+    !response.ok
+    && provider.name === 'openrouter'
+    && shouldRetryWithOpenRouterFallback(response.status, responseText, requestedModel, OPENROUTER_FALLBACK_MODEL)
+  ) {
+    console.warn(
+      `[EquityLabs] OpenRouter model "${requestedModel}" unavailable. Retrying with fallback "${OPENROUTER_FALLBACK_MODEL}".`,
+    );
+
+    effectiveModel = OPENROUTER_FALLBACK_MODEL;
+    ({ response, responseText } = await executePaidChatCompletion(
+      provider,
+      effectiveModel,
+      messages,
+      maxTokens,
+    ));
+  }
 
   if (!response.ok) {
-    let errorMessage = `AI Gateway error ${response.status}`;
+    let errorMessage = `${provider.name === 'openrouter' ? 'OpenRouter' : 'AI Gateway'} error ${response.status}`;
     try {
       const errorData = JSON.parse(responseText);
-      errorMessage = errorData.error?.message || errorMessage;
+      errorMessage = errorData.error?.message || errorData.message || errorMessage;
     } catch {
       // Keep gateway status message.
     }
@@ -278,7 +403,16 @@ export async function callPaidGateway(
   }
 
   try {
-    return { data: JSON.parse(responseText), status: 200 };
+    const parsed = JSON.parse(responseText) as Record<string, unknown>;
+    return {
+      data: {
+        ...parsed,
+        provider: provider.name,
+        model: effectiveModel,
+        requestedModel,
+      },
+      status: 200,
+    };
   } catch {
     return { error: 'Invalid response format from AI', status: 500 };
   }
@@ -324,7 +458,13 @@ export async function callFreeGoogleAI(
     const content = result.response.text();
 
     return {
-      data: { choices: [{ message: { content } }], usage: { provider: 'google-free-tier' } },
+      data: {
+        choices: [{ message: { content } }],
+        usage: { provider: 'google-free-tier' },
+        provider: 'google-free-tier',
+        model: GOOGLE_FREE_MODEL,
+        requestedModel: GOOGLE_FREE_MODEL,
+      },
       status: 200,
     };
   } catch (error) {

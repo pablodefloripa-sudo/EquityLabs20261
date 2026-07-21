@@ -5,7 +5,6 @@ import { GoogleMapsBackground } from '@/components/GoogleMapsBackground';
 import { CustomBackground } from './CustomBackground';
 import { TaskOperator } from './TaskOperator';
 import { DashboardHeader } from './DashboardHeader';
-import { MetricsSidebar } from './MetricsSidebar';
 import { CommunicationArea } from './CommunicationArea';
 import { IntegrationCenter } from './IntegrationCenter';
 import { WallpaperSelector } from './WallpaperSelector';
@@ -84,12 +83,22 @@ export const ProjectDashboard = () => {
 
   return (
     <div
-      className="min-h-screen w-full overflow-hidden relative"
-      style={{ '--dashboard-content-scale': dashboardScale } as CSSProperties}
+      className="h-screen w-full overflow-hidden relative"
+      style={{
+        '--dashboard-content-scale': dashboardScale,
+        '--dashboard-header-height': '72px',
+        '--dashboard-console-height': '228px',
+        '--dashboard-console-gap': '10px',
+        '--dashboard-sidebar-top': '72px',
+        '--dashboard-sidebar-bottom': 'calc(var(--dashboard-console-height) + var(--dashboard-console-gap) + 24px)',
+      } as CSSProperties}
     >
       <GoogleMapsBackground />
       <CustomBackground />
       <DashboardNeonAtmosphere />
+      <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden>
+        <div className="eq-spectrum-frame h-full w-full" />
+      </div>
 
       <motion.div
         animate={{ 
@@ -110,29 +119,24 @@ export const ProjectDashboard = () => {
         />
       </motion.div>
 
-      <motion.div
-        animate={{ 
-          opacity: isFocusMode ? 0 : 1,
-          pointerEvents: isFocusMode ? 'none' : 'auto'
-        }}
-      >
-        <MetricsSidebar />
-      </motion.div>
-
       <motion.main 
-        className="relative z-10 pt-12 h-screen flex flex-col"
+        className="absolute inset-x-0 bottom-0 z-10 flex flex-col overflow-hidden"
+        style={{
+          top: 'var(--dashboard-header-height)',
+        }}
         animate={{
           opacity: isFocusMode ? 0.3 : 1,
         }}
         transition={{ duration: 0.4 }}
       >
         <div className="flex flex-1 gap-4 px-4 overflow-hidden min-h-0">
-          <div className="flex-1 min-w-0 flex flex-col justify-end">
+          <div className="flex-1 min-w-0">
             <CommunicationArea onEnterFocusMode={() => setIsFocusMode(true)} />
           </div>
         </div>
-        <TaskOperator />
       </motion.main>
+
+      <TaskOperator />
 
       <FocusMissionMode 
         isActive={isFocusMode}
